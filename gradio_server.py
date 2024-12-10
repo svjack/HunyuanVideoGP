@@ -11,17 +11,30 @@ from hyvideo.config import parse_args
 from hyvideo.inference import HunyuanVideoSampler
 from hyvideo.constants import NEGATIVE_PROMPT
 
-def initialize_model(model_path):
-    args = parse_args()
-    models_root_path = Path(model_path)
-    if not models_root_path.exists():
-        raise ValueError(f"`models_root` not exists: {models_root_path}")
-    
-    hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(models_root_path, args=args)
-    return hunyuan_video_sampler
+args = parse_args()
+models_root_path = Path(args.model_base)
+if not models_root_path.exists():
+    raise ValueError(f"`models_root` not exists: {models_root_path}")
+
+import json
+
+with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "r", encoding="utf-8") as reader:
+    text = reader.read()
+vae_config= json.loads(text)
+# reduce time window
+if vae_config["sample_tsize"] == 64:
+    vae_config["sample_tsize"] = 32 
+with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "w", encoding="utf-8") as writer:
+    writer.write(json.dumps(vae_config))
+
+args.flow_reverse = True    
+
+hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(models_root_path, args=args, device="cpu")
+from mmgp import offload 
+pipe = hunyuan_video_sampler.pipeline
+offload.all(pipe)
 
 def generate_video(
-    model,
     prompt,
     resolution,
     video_length,
@@ -29,18 +42,20 @@ def generate_video(
     num_inference_steps,
     guidance_scale,
     flow_shift,
-    embedded_guidance_scale
+    embedded_guidance_scale,
+    progress=gr.Progress(track_tqdm=True)
+
 ):
     seed = None if seed == -1 else seed
     width, height = resolution.split("x")
     width, height = int(width), int(height)
     negative_prompt = "" # not applicable in the inference
 
-    outputs = model.predict(
+    outputs = hunyuan_video_sampler.predict(
         prompt=prompt,
         height=height,
         width=width, 
-        video_length=video_length,
+        video_length=(video_length // 4)* 4 + 1 ,
         seed=seed,
         negative_prompt=negative_prompt,
         infer_steps=num_inference_steps,
@@ -65,14 +80,17 @@ def generate_video(
     return video_path
 
 def create_demo(model_path, save_path):
-    model = initialize_model(model_path)
     
     with gr.Blocks() as demo:
-        gr.Markdown("# Hunyuan Video Generation")
+        gr.Markdown("<div align=center><H1>HunyuanVideo<SUP>GP</SUP> by Tencent</H3></div>")
+        gr.Markdown("*GPU Poor version by **DeepBeepMeep**. Now this great video generator can run smoothly on a 24 GB rig.*")
+        gr.Markdown("Please be aware of these limits if you have a RTX 3090 / RTX 4090:")
+        gr.Markdown("- max 97 frames for 848 x 480")
+        gr.Markdown("- max 41 frames for 1280 x 720")
         
         with gr.Row():
             with gr.Column():
-                prompt = gr.Textbox(label="Prompt", value="A cat walks on the grass, realistic style.")
+                prompt = gr.Textbox(label="Prompt", value="A large orange octopus is seen resting on the bottom of the ocean floor, blending in with the sandy and rocky terrain. Its tentacles are spread out around its body, and its eyes are closed. The octopus is unaware of a king crab that is crawling towards it from behind a rock, its claws raised and ready to attack. The crab is brown and spiny, with long legs and antennae. The scene is captured from a wide angle, showing the vastness and depth of the ocean. The water is clear and blue, with rays of sunlight filtering through. The shot is sharp and crisp, with a high dynamic range. The octopus and the crab are in focus, while the background is slightly blurred, creating a depth of field effect.")
                 with gr.Row():
                     resolution = gr.Dropdown(
                         choices=[
@@ -84,22 +102,28 @@ def create_demo(model_path, save_path):
                             ("960x960 (1:1, 720p)", "960x960"),
                             # 540p
                             ("960x544 (16:9, 540p)", "960x544"),
+                            ("848x480 (16:9, 540p)", "848x480"),
                             ("544x960 (9:16, 540p)", "544x960"),
                             ("832x624 (4:3, 540p)", "832x624"), 
                             ("624x832 (3:4, 540p)", "624x832"),
                             ("720x720 (1:1, 540p)", "720x720"),
                         ],
-                        value="1280x720",
+                        value="848x480",
                         label="Resolution"
                     )
-                    video_length = gr.Dropdown(
-                        label="Video Length",
-                        choices=[
-                            ("2s(65f)", 65),
-                            ("5s(129f)", 129),
-                        ],
-                        value=129,
-                    )
+
+                video_length = gr.Slider(5, 133, value=97, step=4, label="Number of frames (30 = 1s)")
+
+                    # video_length = gr.Dropdown(
+                    #     label="Video Length",
+                    #     choices=[
+                    #         ("1.5s(41f)", 41),
+                    #         ("2s(65f)", 65),
+                    #         ("4s(97f)", 97),
+                    #         ("5s(129f)", 129),
+                    #     ],
+                    #     value=97,
+                    # )
                 num_inference_steps = gr.Slider(1, 100, value=50, step=1, label="Number of Inference Steps")
                 show_advanced = gr.Checkbox(label="Show Advanced Options", value=False)
                 with gr.Row(visible=False) as advanced_row:
@@ -115,7 +139,7 @@ def create_demo(model_path, save_path):
                 output = gr.Video(label="Generated Video")
         
         generate_btn.click(
-            fn=lambda *inputs: generate_video(model, *inputs),
+            fn=generate_video,
             inputs=[
                 prompt,
                 resolution,
@@ -134,8 +158,6 @@ def create_demo(model_path, save_path):
 if __name__ == "__main__":
     os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
     server_name = os.getenv("SERVER_NAME", "0.0.0.0")
-    server_port = int(os.getenv("SERVER_PORT", "8081"))
-    args = parse_args()
-    print(args)
+    server_port = int(os.getenv("SERVER_PORT", "7860"))
     demo = create_demo(args.model_base, args.save_path)
     demo.launch(server_name=server_name, server_port=server_port)

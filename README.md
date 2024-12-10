@@ -8,6 +8,8 @@
 
 # HunyuanVideo: A Systematic Framework For Large Video Generation Model
 
+*GPU Poor version by **DeepBeepMeep**. Now this great video generator can run smoothly on a 24 GB rig.*
+
 <div align="center">
   <a href="https://github.com/Tencent/HunyuanVideo"><img src="https://img.shields.io/static/v1?label=HunyuanVideo Code&message=Github&color=blue&logo=github-pages"></a> &ensp;
   <a href="https://aivideo.hunyuan.tencent.com"><img src="https://img.shields.io/static/v1?label=Project%20Page&message=Web&color=green&logo=github-pages"></a> &ensp;
