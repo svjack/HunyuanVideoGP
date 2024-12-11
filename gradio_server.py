@@ -32,7 +32,8 @@ args.flow_reverse = True
 hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(models_root_path, args=args, device="cpu")
 from mmgp import offload 
 pipe = hunyuan_video_sampler.pipeline
-offload.all(pipe)
+#offload.all(pipe, pinInRAM=True) # faster but you need at least 64 GB of RAM
+offload.all(pipe, pinInRAM=False)
 
 def generate_video(
     prompt,
