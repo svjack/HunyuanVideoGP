@@ -21,7 +21,7 @@ import json
 with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "r", encoding="utf-8") as reader:
     text = reader.read()
 vae_config= json.loads(text)
-# reduce time window
+# reduce time window used by the VAE for temporal splitting (former time windows is too large for 24 GB) 
 if vae_config["sample_tsize"] == 64:
     vae_config["sample_tsize"] = 32 
 with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "w", encoding="utf-8") as writer:
@@ -33,7 +33,8 @@ hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(models_root_path, ar
 from mmgp import offload 
 pipe = hunyuan_video_sampler.pipeline
 #offload.all(pipe, pinInRAM=True) # faster but you need at least 64 GB of RAM
-offload.all(pipe, pinInRAM=False)
+#offload.all(pipe,  modelsToQuantize= ["text_encoder"]) # if you have between 32 GB and 64 GB of RAM
+offload.all(pipe) # if you have between 48GB and 64 GB of RAM
 
 def generate_video(
     prompt,
