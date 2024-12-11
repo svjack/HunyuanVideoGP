@@ -2,9 +2,6 @@
 
 [中文阅读](./README_zh.md)
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/Tencent/HunyuanVideo/refs/heads/main/assets/logo.png"  height=100>
-</p>
 
 # HunyuanVideo: A Systematic Framework For Large Video Generation Model
 
@@ -25,7 +22,16 @@
 </p>
 <p align="center">
 
+This fork by DeepBeepMeep is an integration of the mmpg module on the gradio_server.py.
+
+It is an illustration on how one can set up on an existing model some fast and properly working CPU offloading without changing a single line of code in the core model.
+
+For more information on how to use the mmpg module, please go to: https://github.com/deepbeepmeep/mmgp
+
+Please follow the installation instructions further down.
+*
 -----
+
 
 This repo contains PyTorch model definitions, pre-trained weights and inference/sampling code for our paper exploring HunyuanVideo. You can find more visualizations on our [project page](https://aivideo.hunyuan.tencent.com).
 
