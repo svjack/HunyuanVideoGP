@@ -186,7 +186,8 @@ class Inference(object):
 
         # =========================== Build main model ===========================
         logger.info("Building model...")
-        factor_kwargs = {"device": device, "dtype": PRECISION_TO_TYPE[args.precision]}
+#        factor_kwargs = {"device": device, "dtype": PRECISION_TO_TYPE[args.precision]}
+        factor_kwargs = {"device": "meta", "dtype": PRECISION_TO_TYPE[args.precision]}
         in_channels = args.latent_channels
         out_channels = args.latent_channels
 
@@ -196,7 +197,7 @@ class Inference(object):
             out_channels=out_channels,
             factor_kwargs=factor_kwargs,
         )
-        model = model.to(device)
+#        model = model.to(device)
         model = Inference.load_state_dict(args, model, pretrained_model_path)
         model.eval()
 
@@ -347,7 +348,7 @@ class Inference(object):
                     f"Missing key: `{load_key}` in the checkpoint: {model_path}. The keys in the checkpoint "
                     f"are: {list(state_dict.keys())}."
                 )
-        model.load_state_dict(state_dict, strict=True)
+        model.load_state_dict(state_dict, strict=True, assign = True )
         return model
 
     @staticmethod
@@ -435,10 +436,10 @@ class HunyuanVideoSampler(Inference):
             progress_bar_config=progress_bar_config,
             args=args,
         )
-        if self.use_cpu_offload:
-            pipeline.enable_sequential_cpu_offload()
-        else:
-            pipeline = pipeline.to(device)
+        # if self.use_cpu_offload:
+        #     pipeline.enable_sequential_cpu_offload()
+        # else:
+        #     pipeline = pipeline.to(device)
 
         return pipeline
 
