@@ -63,6 +63,13 @@ conda activate HunyuanVideo
 # 3. Install pip dependencies
 python -m pip install -r requirements.txt
 
+
+# 4.1 optional Flash attention support (easy to install on Linux but much harderon Windows)
+python -m pip install flash-attn==2.7.2.post1
+
+# 4.2 optional Sage attention support (30% faster, easy to install on Linux but much harderon Windows)
+python -m pip install sageattention==1.0.6 
+
 ```
 
 ### Run a Gradio Server on port 7860 (recommended)

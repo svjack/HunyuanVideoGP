@@ -136,6 +136,7 @@ class MMDoubleStreamBlock(nn.Module):
         img: torch.Tensor,
         txt: torch.Tensor,
         vec: torch.Tensor,
+        attn_mask = None,  
         cu_seqlens_q: Optional[torch.Tensor] = None,
         cu_seqlens_kv: Optional[torch.Tensor] = None,
         max_seqlen_q: Optional[int] = None,
@@ -197,9 +198,9 @@ class MMDoubleStreamBlock(nn.Module):
         q = torch.cat((img_q, txt_q), dim=1)
         k = torch.cat((img_k, txt_k), dim=1)
         v = torch.cat((img_v, txt_v), dim=1)
-        assert (
-            cu_seqlens_q.shape[0] == 2 * img.shape[0] + 1
-        ), f"cu_seqlens_q.shape:{cu_seqlens_q.shape}, img.shape[0]:{img.shape[0]}"
+        # assert (
+        #     cu_seqlens_q.shape[0] == 2 * img.shape[0] + 1
+        # ), f"cu_seqlens_q.shape:{cu_seqlens_q.shape}, img.shape[0]:{img.shape[0]}"
         
         # attention computation start
         if not self.hybrid_seq_parallel_attn:
@@ -208,6 +209,7 @@ class MMDoubleStreamBlock(nn.Module):
                 k,
                 v,
                 mode=self.attention_mode,
+                attn_mask=attn_mask,                
                 cu_seqlens_q=cu_seqlens_q,
                 cu_seqlens_kv=cu_seqlens_kv,
                 max_seqlen_q=max_seqlen_q,
@@ -332,11 +334,13 @@ class MMSingleStreamBlock(nn.Module):
         x: torch.Tensor,
         vec: torch.Tensor,
         txt_len: int,
+        attn_mask= None,
         cu_seqlens_q: Optional[torch.Tensor] = None,
         cu_seqlens_kv: Optional[torch.Tensor] = None,
         max_seqlen_q: Optional[int] = None,
         max_seqlen_kv: Optional[int] = None,
         freqs_cis: Tuple[torch.Tensor, torch.Tensor] = None,
+        
     ) -> torch.Tensor:
         mod_shift, mod_scale, mod_gate = self.modulation(vec).chunk(3, dim=-1)
         x_mod = modulate(self.pre_norm(x), shift=mod_shift, scale=mod_scale)
@@ -363,9 +367,9 @@ class MMSingleStreamBlock(nn.Module):
             k = torch.cat((img_k, txt_k), dim=1)
 
         # Compute attention.
-        assert (
-            cu_seqlens_q.shape[0] == 2 * x.shape[0] + 1
-        ), f"cu_seqlens_q.shape:{cu_seqlens_q.shape}, x.shape[0]:{x.shape[0]}"
+        # assert (
+        #     cu_seqlens_q.shape[0] == 2 * x.shape[0] + 1
+        # ), f"cu_seqlens_q.shape:{cu_seqlens_q.shape}, x.shape[0]:{x.shape[0]}"
         
         # attention computation start
         if not self.hybrid_seq_parallel_attn:
@@ -374,6 +378,7 @@ class MMSingleStreamBlock(nn.Module):
                 k,
                 v,
                 mode=self.attention_mode,
+                attn_mask=attn_mask,                
                 cu_seqlens_q=cu_seqlens_q,
                 cu_seqlens_kv=cu_seqlens_kv,
                 max_seqlen_q=max_seqlen_q,
@@ -472,7 +477,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
         use_attention_mask: bool = True,
         dtype: Optional[torch.dtype] = None,
         device: Optional[torch.device] = None,
-        attention_mode: Optional[str] = "flash"
+        attention_mode: Optional[str] = "sdpa"
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -483,7 +488,8 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
         self.unpatchify_channels = self.out_channels
         self.guidance_embed = guidance_embed
         self.rope_dim_list = rope_dim_list
-
+        self.attention_mode = attention_mode
+        
         # Text projection. Default to linear projection.
         # Alternative: TokenRefiner. See more details (LI-DiT): http://arxiv.org/abs/2406.11831
         self.use_attention_mask = use_attention_mask
@@ -658,6 +664,24 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
         max_seqlen_q = img_seq_len + txt_seq_len
         max_seqlen_kv = max_seqlen_q
 
+        # thanks to kijai (https://github.com/kijai/ComfyUI-HunyuanVideoWrapper/), for the code to support sdpa
+        if self.attention_mode == "sdpa":
+            cu_seqlens_q, cu_seqlens_kv = None, None
+            # Create a square boolean mask filled with False
+            attn_mask = torch.zeros((1, max_seqlen_q, max_seqlen_q), dtype=torch.bool, device=text_mask.device)
+
+            # Calculate the valid attention regions
+            text_len = text_mask[0].sum().item()
+            total_len = text_len + img_seq_len
+
+            # Allow attention to all tokens up to total_len
+            attn_mask[0, :total_len, :total_len] = True
+        else:
+            attn_mask = None
+            # Compute cu_squlens for flash and sage attention
+            cu_seqlens_q = get_cu_seqlens(text_mask, img_seq_len)
+            cu_seqlens_kv = cu_seqlens_q
+
         freqs_cis = (freqs_cos, freqs_sin) if freqs_cos is not None else None
         # --------------------- Pass through DiT blocks ------------------------
         for _, block in enumerate(self.double_blocks):
@@ -665,6 +689,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
                 img,
                 txt,
                 vec,
+                attn_mask,                
                 cu_seqlens_q,
                 cu_seqlens_kv,
                 max_seqlen_q,
@@ -682,6 +707,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
                     x,
                     vec,
                     txt_seq_len,
+                    attn_mask,                
                     cu_seqlens_q,
                     cu_seqlens_kv,
                     max_seqlen_q,

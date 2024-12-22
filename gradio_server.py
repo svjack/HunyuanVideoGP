@@ -17,7 +17,7 @@ text_encoder_choices = ["ckpts/text_encoder/llava-llama-3-8b-v1_1_fp16.safetenso
 server_config_filename = "gradio_config.json"
 
 if not Path(server_config_filename).is_file():
-    server_config = {"attention_mode" : "flash",  
+    server_config = {"attention_mode" : "sdpa",  
                      "transformer_filename": transformer_choices[1], 
                      "text_encoder_filename" : text_encoder_choices[0],
 
@@ -87,7 +87,6 @@ with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "w", encoding="utf-8
     writer.write(json.dumps(vae_config))
 
 args.flow_reverse = True    
-
 hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(transformer_filename, text_encoder_filename, attention_mode = attention_mode, args=args,  device="cpu") 
 
 pipe = hunyuan_video_sampler.pipeline
@@ -197,8 +196,9 @@ def create_demo(model_path, save_path):
                  )
                 attention_choice = gr.Dropdown(
                     choices=[
-                        ("Flash: default with the best quality", "flash"),
-                        ("Sage: 30% faster but worse quality", "sage"),
+                        ("Scale Dot Product Attention: default", "sdpa"),
+                        ("Flash: good quality - requires additional install", "flash"),
+                        ("Sage: 30% faster but worse quality - requires additional install", "sage"),
                     ],
                     value= attention_mode,
                     label="Attention Type"

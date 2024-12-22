@@ -128,6 +128,8 @@ def attention(
         )
         
     elif mode == "sdpa":
+        if attn_mask is not None and attn_mask.dtype != torch.bool:
+            attn_mask = attn_mask.to(q.dtype)
         x = F.scaled_dot_product_attention(
             q, k, v, attn_mask=attn_mask, dropout_p=drop_rate, is_causal=causal
         )
