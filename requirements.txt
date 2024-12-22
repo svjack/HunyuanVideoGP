@@ -1,5 +1,6 @@
-torch==2.5.0
-torchvision==0.20.0
+torch==2.5.1
+torchvision==0.20.1
+torchaudio==2.5.1
 opencv-python==4.9.0.80
 diffusers==0.30.2
 transformers==4.39.3

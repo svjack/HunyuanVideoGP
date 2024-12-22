@@ -64,10 +64,10 @@ conda activate HunyuanVideo
 python -m pip install -r requirements.txt
 
 
-# 4.1 optional Flash attention support (easy to install on Linux but much harderon Windows)
+# 4.1 optional Flash attention support (easy to install on Linux but much harder on Windows)
 python -m pip install flash-attn==2.7.2.post1
 
-# 4.2 optional Sage attention support (30% faster, easy to install on Linux but much harderon Windows)
+# 4.2 optional Sage attention support (30% faster, easy to install on Linux but much harder on Windows)
 python -m pip install sageattention==1.0.6 
 
 ```
