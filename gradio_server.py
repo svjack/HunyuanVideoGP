@@ -12,6 +12,12 @@ from hyvideo.inference import HunyuanVideoSampler
 from hyvideo.constants import NEGATIVE_PROMPT
 from mmgp import offload, profile_type 
 
+
+args = parse_args()
+
+
+force_profile_no = int(args.profile)
+
 transformer_choices=["ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_bf16.safetensors", "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_quanto_int8.safetensors", "ckpts/hunyuan-video-t2v-720p/transformers/fast_hunyuan_video_720_quanto_int8.safetensors"]
 text_encoder_choices = ["ckpts/text_encoder/llava-llama-3-8b-v1_1_fp16.safetensors", "ckpts/text_encoder/llava-llama-3-8b-v1_1_quanto_int8.safetensors"]
 server_config_filename = "gradio_config.json"
@@ -21,7 +27,7 @@ if not Path(server_config_filename).is_file():
                      "transformer_filename": transformer_choices[1], 
                      "text_encoder_filename" : text_encoder_choices[0],
 
-                     "profile" : profile_type.HighRAM_LowVRAM_Fast }
+                     "profile" : profile_type.LowRAM_LowVRAM_Slow }
 
     with open(server_config_filename, "w", encoding="utf-8") as writer:
         writer.write(json.dumps(server_config))
@@ -33,7 +39,8 @@ else:
 transformer_filename = server_config["transformer_filename"]
 text_encoder_filename = server_config["text_encoder_filename"]
 attention_mode = server_config["attention_mode"]
-profile = server_config["profile"]
+profile =  force_profile_no if force_profile_no >=0 else server_config["profile"]
+
 
 #transformer_filename = "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_bf16.safetensors"
 #transformer_filename = "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_quanto_int8.safetensors"
@@ -71,7 +78,6 @@ def download_models(transformer_filename, text_encoder_filename):
 
 download_models(transformer_filename, text_encoder_filename) 
 
-args = parse_args()
 # models_root_path = Path(args.model_base)
 # if not models_root_path.exists():
 #     raise ValueError(f"`models_root` not exists: {models_root_path}")
@@ -110,6 +116,15 @@ def apply_changes(
     return "<h1>New Config file created. Please restart the Gradio Server</h1>"
 
 
+from moviepy.editor import ImageSequenceClip
+import numpy as np
+
+def save_video(final_frames, output_path, fps=24):
+    assert final_frames.ndim == 4 and final_frames.shape[3] == 3, f"invalid shape: {final_frames} (need t h w c)"
+    if final_frames.dtype != np.uint8:
+        final_frames = (final_frames * 255).astype(np.uint8)
+    ImageSequenceClip(list(final_frames), fps=fps).write_videofile(output_path, verbose= False, logger = None)
+
 
 def generate_video(
     prompt,
@@ -142,17 +157,26 @@ def generate_video(
         batch_size=1,
         embedded_guidance_scale=embedded_guidance_scale
     )
-    
+
+
+    from einops import rearrange
+
     samples = outputs['samples']
-    sample = samples[0].unsqueeze(0)
-    
+    sample = samples[0] # t h w c)"
+#    sample = sample.unsqueeze(0)
+
+    videos = rearrange(sample.cpu().numpy(), "c t h w -> t h w c")
+
     save_path = os.path.join(os.getcwd(), "gradio_outputs")
     os.makedirs(save_path, exist_ok=True)
-    
     time_flag = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d-%H:%M:%S")
     video_path = f"{save_path}/{time_flag}_seed{outputs['seeds'][0]}_{outputs['prompts'][0][:100].replace('/','')}.mp4"
-    save_videos_grid(sample, video_path, fps=24)
-    logger.info(f'Sample saved to: {video_path}')
+
+    save_video(videos, video_path )
+    print(f"New video saved to Path: "+video_path)
+
+    # save_videos_grid(sample, video_path, fps=24)
+    # logger.info(f'Sample saved to: {video_path}')
     
     return video_path
 

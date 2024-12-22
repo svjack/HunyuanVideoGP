@@ -22,6 +22,13 @@ def parse_args(namespace=None):
 def add_network_args(parser: argparse.ArgumentParser):
     group = parser.add_argument_group(title="HunyuanVideo network args")
 
+    group.add_argument(
+        "--profile",
+        type=str,
+        default=-1,
+        help="Profile No "
+    )
+  
     # Main model
     group.add_argument(
         "--model",
