@@ -113,7 +113,7 @@ def apply_changes(
     with open(server_config_filename, "w", encoding="utf-8") as writer:
         writer.write(json.dumps(server_config))
 
-    return "<h1>New Config file created. Please restart the Gradio Server</h1>"
+    return "<h1>New Config file created. Please restart the Gradio  Server</h1>"
 
 
 from moviepy.editor import ImageSequenceClip
@@ -162,21 +162,19 @@ def generate_video(
     from einops import rearrange
 
     samples = outputs['samples']
-    sample = samples[0] # t h w c)"
-#    sample = sample.unsqueeze(0)
+    sample = samples[0]
 
-    videos = rearrange(sample.cpu().numpy(), "c t h w -> t h w c")
+    video = rearrange(sample.cpu().numpy(), "c t h w -> t h w c")
 
     save_path = os.path.join(os.getcwd(), "gradio_outputs")
     os.makedirs(save_path, exist_ok=True)
-    time_flag = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d-%H:%M:%S")
-    video_path = f"{save_path}/{time_flag}_seed{outputs['seeds'][0]}_{outputs['prompts'][0][:100].replace('/','')}.mp4"
+    time_flag = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d-%Hh%Mm%Ss")
+    file_name = f"{time_flag}_seed{outputs['seeds'][0]}_{outputs['prompts'][0][:100].replace('/','')}.mp4".replace(':',' ').replace('\\',' ')
+    video_path = os.path.join(os.getcwd(), "gradio_outputs", file_name)
 
-    save_video(videos, video_path )
+    save_video(video, video_path )
     print(f"New video saved to Path: "+video_path)
 
-    # save_videos_grid(sample, video_path, fps=24)
-    # logger.info(f'Sample saved to: {video_path}')
     
     return video_path
 
