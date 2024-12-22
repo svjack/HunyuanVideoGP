@@ -13,6 +13,6 @@ loguru==0.7.2
 imageio==2.34.0
 imageio-ffmpeg==0.5.1
 safetensors==0.4.3
-flash-attn=2.7.2
-sageattention=1.0.6 
+flash-attn==2.7.2
+sageattention==1.0.6 
 mmgp==2.0.0
