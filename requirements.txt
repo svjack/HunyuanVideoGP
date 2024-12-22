@@ -16,3 +16,4 @@ safetensors==0.4.3
 flash-attn==2.7.2.post1
 sageattention==1.0.6 
 mmgp==2.0.0
+gradio==5.8.0
