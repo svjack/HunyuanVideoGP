@@ -14,7 +14,7 @@ loguru==0.7.2
 imageio==2.34.0
 imageio-ffmpeg==0.5.1
 safetensors==0.4.3
-mmgp==2.0.0
+mmgp==2.0.1
 gradio==5.8.0
 moviepy==1.0.3
 #flash-attn==2.7.2.post1
