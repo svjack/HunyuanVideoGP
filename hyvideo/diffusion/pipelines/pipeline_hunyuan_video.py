@@ -961,6 +961,9 @@ class HunyuanVideoPipeline(DiffusionPipeline):
             for i, t in enumerate(timesteps):
                 if self.interrupt:
                     continue
+                import os
+                if os.path.isfile("abort"):
+                    continue
 
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = (

@@ -128,7 +128,7 @@ class TextEncoder(nn.Module):
             tokenizer_type if tokenizer_type is not None else text_encoder_type
         )
         self.tokenizer_path = (
-            tokenizer_path if tokenizer_path is not None else text_encoder_path
+            tokenizer_path if tokenizer_path is not None else None # text_encoder_path
         )
         self.use_attention_mask = use_attention_mask
         if prompt_template_video is not None:
@@ -177,13 +177,22 @@ class TextEncoder(nn.Module):
         else:
             raise ValueError(f"Unsupported text encoder type: {text_encoder_type}")
 
-        self.model, self.model_path = load_text_encoder(
-            text_encoder_type=self.text_encoder_type,
-            text_encoder_precision=self.precision,
-            text_encoder_path=self.model_path,
-            logger=self.logger,
-            device=device,
-        )
+        if "llm" in text_encoder_type:
+
+            from mmgp import offload
+            
+            self.model= offload.fast_load_transformers_model(self.model_path)
+            self.model.final_layer_norm = self.model.norm
+        
+        else:
+            self.model, self.model_path = load_text_encoder(
+                text_encoder_type=self.text_encoder_type,
+                text_encoder_precision=self.precision,
+                text_encoder_path=self.model_path,
+                logger=self.logger,
+                device=device,
+            )
+
         self.dtype = self.model.dtype
         self.device = self.model.device
 

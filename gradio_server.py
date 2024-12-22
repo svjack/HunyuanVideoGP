@@ -5,18 +5,77 @@ from loguru import logger
 from datetime import datetime
 import gradio as gr
 import random
-
+import json
 from hyvideo.utils.file_utils import save_videos_grid
 from hyvideo.config import parse_args
 from hyvideo.inference import HunyuanVideoSampler
 from hyvideo.constants import NEGATIVE_PROMPT
+from mmgp import offload, profile_type 
+
+transformer_choices=["ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_bf16.safetensors", "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_quanto_int8.safetensors", "ckpts/hunyuan-video-t2v-720p/transformers/fast_hunyuan_video_720_quanto_int8.safetensors"]
+text_encoder_choices = ["ckpts/text_encoder/llava-llama-3-8b-v1_1_fp16.safetensors", "ckpts/text_encoder/llava-llama-3-8b-v1_1_quanto_int8.safetensors"]
+server_config_filename = "gradio_config.json"
+
+if not Path(server_config_filename).is_file():
+    server_config = {"attention_mode" : "flash",  
+                     "transformer_filename": transformer_choices[1], 
+                     "text_encoder_filename" : text_encoder_choices[0],
+
+                     "profile" : profile_type.HighRAM_LowVRAM_Fast }
+
+    with open(server_config_filename, "w", encoding="utf-8") as writer:
+        writer.write(json.dumps(server_config))
+else:
+    with open(server_config_filename, "r", encoding="utf-8") as reader:
+        text = reader.read()
+    server_config = json.loads(text)
+
+transformer_filename = server_config["transformer_filename"]
+text_encoder_filename = server_config["text_encoder_filename"]
+attention_mode = server_config["attention_mode"]
+profile = server_config["profile"]
+
+#transformer_filename = "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_bf16.safetensors"
+#transformer_filename = "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_quanto_int8.safetensors"
+#transformer_filename = "ckpts/hunyuan-video-t2v-720p/transformers/fast_hunyuan_video_720_quanto_int8.safetensors"
+
+#text_encoder_filename = "ckpts/text_encoder/llava-llama-3-8b-v1_1_fp16.safetensors"
+#text_encoder_filename = "ckpts/text_encoder/llava-llama-3-8b-v1_1_quanto_int8.safetensors"
+
+#attention_mode="sage"
+#attention_mode="flash"
+
+def download_models(transformer_filename, text_encoder_filename):
+    def computeList(filename):
+        pos = filename.rfind("/")
+        filename = filename[pos+1:]
+        if not "quanto" in filename:
+            return [filename]        
+        pos = filename.rfind(".")
+        return [filename, filename[:pos] +"_map.json"]
+    
+    from huggingface_hub import hf_hub_download, snapshot_download    
+    repoId = "DeepBeepMeep/HunyuanVideo" 
+    sourceFolderList = ["text_encoder_2", "text_encoder", "hunyuan-video-t2v-720p/vae", "hunyuan-video-t2v-720p/transformers" ]
+    fileList = [ [], ["config.json", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json"] + computeList(text_encoder_filename) , [],  computeList(transformer_filename) ]
+    targetRoot = "ckpts/" 
+    for sourceFolder, files in zip(sourceFolderList,fileList ):
+        if len(files)==0:
+            if not Path(targetRoot + sourceFolder).exists():
+                snapshot_download(repo_id=repoId,  allow_patterns=sourceFolder +"/*", local_dir= targetRoot)
+        else:
+             for onefile in files:      
+                if not os.path.isfile(targetRoot + sourceFolder + "/" + onefile ):          
+                    hf_hub_download(repo_id=repoId,  filename=onefile, local_dir = targetRoot, subfolder=sourceFolder)
+
+
+download_models(transformer_filename, text_encoder_filename) 
 
 args = parse_args()
-models_root_path = Path(args.model_base)
-if not models_root_path.exists():
-    raise ValueError(f"`models_root` not exists: {models_root_path}")
+# models_root_path = Path(args.model_base)
+# if not models_root_path.exists():
+#     raise ValueError(f"`models_root` not exists: {models_root_path}")
 
-import json
 
 with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "r", encoding="utf-8") as reader:
     text = reader.read()
@@ -29,12 +88,29 @@ with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "w", encoding="utf-8
 
 args.flow_reverse = True    
 
-hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(models_root_path, args=args, device="cpu")
-from mmgp import offload 
+hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(transformer_filename, text_encoder_filename, attention_mode = attention_mode, args=args,  device="cpu") 
+
 pipe = hunyuan_video_sampler.pipeline
-#offload.all(pipe, pinInRAM=True) # faster but you need at least 64 GB of RAM
-#offload.all(pipe,  modelsToQuantize= ["text_encoder"]) # if you have between 32 GB and 64 GB of RAM
-offload.all(pipe) # if you have between 48GB and 64 GB of RAM
+
+offload.profile(pipe, profile_no= profile, quantizeTransformer = False)
+
+def apply_changes(
+                    transformer_choice,
+                    text_encoder_choice,
+                    attention_choice,
+                    profile_choice,
+):
+    server_config = {"attention_mode" : attention_choice,  
+                     "transformer_filename": transformer_choices[transformer_choice], 
+                     "text_encoder_filename" : text_encoder_choices[text_encoder_choice],
+                     "profile" : profile_choice }
+
+    with open(server_config_filename, "w", encoding="utf-8") as writer:
+        writer.write(json.dumps(server_config))
+
+    return "<h1>New Config file created. Please restart the Gradio Server</h1>"
+
+
 
 def generate_video(
     prompt,
@@ -86,10 +162,74 @@ def create_demo(model_path, save_path):
     with gr.Blocks() as demo:
         gr.Markdown("<div align=center><H1>HunyuanVideo<SUP>GP</SUP> by Tencent</H3></div>")
         gr.Markdown("*GPU Poor version by **DeepBeepMeep**. Now this great video generator can run smoothly on a 24 GB rig.*")
-        gr.Markdown("Please be aware of these limits if you have a RTX 3090 / RTX 4090:")
-        gr.Markdown("- max 97 frames for 848 x 480")
-        gr.Markdown("- max 41 frames for 1280 x 720")
-        
+        gr.Markdown("Please be aware of these limits with the Fast profile if you have 24 GB of VRAM (RTX 3090 / RTX 4090):")
+        gr.Markdown("- max 192 frames for 848 x 480 ")
+        gr.Markdown("- max 86 frames for 1280 x 720")
+        gr.Markdown("In the worst case, one step should not take more than 2 minutes. If it the case you may be running out of RAM / VRAM. Try to generate fewer images / lower res / a less demanding profile.")
+
+        with gr.Accordion("Video Engine Configuration", open = False):
+            gr.Markdown("For the changes to be effective you will need to restart the gradio_server")
+
+            with gr.Column():
+                index = transformer_choices.index(transformer_filename)
+                index = 0 if index ==0 else index
+
+                transformer_choice = gr.Dropdown(
+                    choices=[
+                        ("Hunyuan Video 16 bits - the default engine in its original glory, offers a slightly better image quality but slower and requires more RAM", 0),
+                        ("Hunyuan Video quantized to 8 bits (recommended) - the default engine but quantized", 1),
+                        ("Fast Hunyuan Video quantized to 8 bits - requires less than 10 steps but worse quality", 2), 
+                    ],
+                    value= index,
+                    label="Transformer"
+                 )
+                index = text_encoder_choices.index(text_encoder_filename)
+                index = 0 if index ==0 else index
+
+                gr.Markdown("Note that even if you choose a 16 bits Llava model below, depending on the profile it may be automatically quantized to 8 bits on the fly")
+                text_encoder_choice = gr.Dropdown(
+                    choices=[
+                        ("Llava Llama 1.1 16 bits - unquantized text encoder, better quality uses more RAM", 0),
+                        ("Llava Llama 1.1 quantized to 8 bits - quantized text encoder, worse quality but uses less RAM", 1),
+                    ],
+                    value= index,
+                    label="Text Encoder"
+                 )
+                attention_choice = gr.Dropdown(
+                    choices=[
+                        ("Flash: default with the best quality", "flash"),
+                        ("Sage: 30% faster but worse quality", "sage"),
+                    ],
+                    value= attention_mode,
+                    label="Attention Type"
+                 )
+                profile_choice = gr.Dropdown(
+                    choices=[
+                ("HighRAM_HighVRAM_Fastest: at least 48 GB of RAM and 24 GB of VRAM : the fastest well suited for a RTX 3090 / RTX 4090", 1),
+                ("HighRAM_LowVRAM_Fast: at least 48 GB of RAM and 12 GB of VRAM : a bit slower, better suited for RTX 3070/3080/4070/4080 or for RTX 3090 / RTX 4090 with large pictures batches or long videos", 2),
+                ("LowRAM_HighVRAM_Medium: at least 32 GB of RAM and 24 GB of VRAM : so so speed but adapted for RTX 3090 / RTX 4090 with limited RAM",3),
+                ("LowRAM_LowVRAM_Slow: at least 32 GB of RAM and 12 GB of VRAM : if have little VRAM or generate longer videos",4),
+                ("VerylowRAM_LowVRAM_Slowest: at least 16 GB of RAM and 10 GB of VRAM : if you don't have much it won't be fast but maybe it will work",5)
+                    ],
+                    value= profile,
+                    label="Profile"
+                 )
+
+                msg = gr.Markdown()            
+                apply_btn  = gr.Button("Apply Changes")
+
+
+                apply_btn.click(
+                        fn=apply_changes,
+                        inputs=[
+                            transformer_choice,
+                            text_encoder_choice,
+                            attention_choice,
+                            profile_choice,
+                        ],
+                        outputs=msg
+                    )
+
         with gr.Row():
             with gr.Column():
                 prompt = gr.Textbox(label="Prompt", value="A large orange octopus is seen resting on the bottom of the ocean floor, blending in with the sandy and rocky terrain. Its tentacles are spread out around its body, and its eyes are closed. The octopus is unaware of a king crab that is crawling towards it from behind a rock, its claws raised and ready to attack. The crab is brown and spiny, with long legs and antennae. The scene is captured from a wide angle, showing the vastness and depth of the ocean. The water is clear and blue, with rays of sunlight filtering through. The shot is sharp and crisp, with a high dynamic range. The octopus and the crab are in focus, while the background is slightly blurred, creating a depth of field effect.")
@@ -114,7 +254,7 @@ def create_demo(model_path, save_path):
                         label="Resolution"
                     )
 
-                video_length = gr.Slider(5, 133, value=97, step=4, label="Number of frames (30 = 1s)")
+                video_length = gr.Slider(5, 193, value=97, step=4, label="Number of frames (24 = 1s)")
 
                     # video_length = gr.Dropdown(
                     #     label="Video Length",
@@ -132,7 +272,7 @@ def create_demo(model_path, save_path):
                     with gr.Column():
                         seed = gr.Number(value=-1, label="Seed (-1 for random)")
                         guidance_scale = gr.Slider(1.0, 20.0, value=1.0, step=0.5, label="Guidance Scale")
-                        flow_shift = gr.Slider(0.0, 10.0, value=7.0, step=0.1, label="Flow Shift") 
+                        flow_shift = gr.Slider(0.0, 25.0, value=7.0, step=0.1, label="Flow Shift") 
                         embedded_guidance_scale = gr.Slider(1.0, 20.0, value=6.0, step=0.5, label="Embedded Guidance Scale")
                 show_advanced.change(fn=lambda x: gr.Row(visible=x), inputs=[show_advanced], outputs=[advanced_row])
                 generate_btn = gr.Button("Generate")

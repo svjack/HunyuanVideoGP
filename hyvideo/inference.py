@@ -140,7 +140,7 @@ class Inference(object):
         self.parallel_args = parallel_args
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_path, args, device=None, **kwargs):
+    def from_pretrained(cls, pretrained_model_path, text_encoder_path, args, device=None, **kwargs):
         """
         Initialize the Inference pipeline.
 
@@ -187,7 +187,7 @@ class Inference(object):
         # =========================== Build main model ===========================
         logger.info("Building model...")
 #        factor_kwargs = {"device": device, "dtype": PRECISION_TO_TYPE[args.precision]}
-        factor_kwargs = {"device": "meta", "dtype": PRECISION_TO_TYPE[args.precision]}
+        factor_kwargs = kwargs | {"device": "meta", "dtype": PRECISION_TO_TYPE[args.precision]}
         in_channels = args.latent_channels
         out_channels = args.latent_channels
 
@@ -198,7 +198,14 @@ class Inference(object):
             factor_kwargs=factor_kwargs,
         )
 #        model = model.to(device)
-        model = Inference.load_state_dict(args, model, pretrained_model_path)
+#        model = Inference.load_state_dict(args, model, pretrained_model_path)
+
+        logger.info(f"Loading torch model {pretrained_model_path}...")
+
+        from mmgp import offload
+        offload.load_model_data(model, pretrained_model_path)
+
+
         model.eval()
 
         # ============================= Build extra models ========================
@@ -248,6 +255,7 @@ class Inference(object):
             reproduce=args.reproduce,
             logger=logger,
             device=device if not args.use_cpu_offload else "cpu",
+            text_encoder_path = text_encoder_path 
         )
         text_encoder_2 = None
         if args.text_encoder_2 is not None:

@@ -14,8 +14,30 @@ except ImportError:
     flash_attn_varlen_func = None
     _flash_attn_forward = None
 
+try:
+    from sageattention import sageattn_varlen
+    def sageattn_varlen_wrapper(
+            q,
+            k,
+            v,
+            cu_seqlens_q,
+            cu_seqlens_kv,
+            max_seqlen_q,
+            max_seqlen_kv,
+        ):
+        return sageattn_varlen(q, k, v, cu_seqlens_q, cu_seqlens_kv, max_seqlen_q, max_seqlen_kv)
+except ImportError:
+    sageattn_varlen_wrapper = None
 
 MEMORY_LAYOUT = {
+    "sdpa": (
+        lambda x: x.transpose(1, 2),
+        lambda x: x.transpose(1, 2),
+    ),
+    "sage": (
+        lambda x: x.view(x.shape[0] * x.shape[1], *x.shape[2:]),
+        lambda x: x,
+    ),
     "flash": (
         lambda x: x.view(x.shape[0] * x.shape[1], *x.shape[2:]),
         lambda x: x,
@@ -104,6 +126,27 @@ def attention(
         x = F.scaled_dot_product_attention(
             q, k, v, attn_mask=attn_mask, dropout_p=drop_rate, is_causal=causal
         )
+        
+    elif mode == "sdpa":
+        x = F.scaled_dot_product_attention(
+            q, k, v, attn_mask=attn_mask, dropout_p=drop_rate, is_causal=causal
+        )
+
+    elif mode == "sage":
+        x = sageattn_varlen_wrapper(
+            q,
+            k,
+            v,
+            cu_seqlens_q,
+            cu_seqlens_kv,
+            max_seqlen_q,
+            max_seqlen_kv,
+        )
+        # x with shape [(bxs), a, d]
+        x = x.view(
+            batch_size, max_seqlen_q, x.shape[-2], x.shape[-1]
+        )  # reshape x to [b, s, a, d]      
+
     elif mode == "flash":
         x = flash_attn_varlen_func(
             q,

@@ -36,10 +36,12 @@ class MMDoubleStreamBlock(nn.Module):
         qkv_bias: bool = False,
         dtype: Optional[torch.dtype] = None,
         device: Optional[torch.device] = None,
-    ):
+        attention_mode: str = "sdpa",        
+    ):  
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
 
+        self.attention_mode = attention_mode
         self.deterministic = False
         self.heads_num = heads_num
         head_dim = hidden_size // heads_num
@@ -205,6 +207,7 @@ class MMDoubleStreamBlock(nn.Module):
                 q,
                 k,
                 v,
+                mode=self.attention_mode,
                 cu_seqlens_q=cu_seqlens_q,
                 cu_seqlens_kv=cu_seqlens_kv,
                 max_seqlen_q=max_seqlen_q,
@@ -271,10 +274,11 @@ class MMSingleStreamBlock(nn.Module):
         qk_scale: float = None,
         dtype: Optional[torch.dtype] = None,
         device: Optional[torch.device] = None,
+        attention_mode: str = "sdpa",
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
-
+        self.attention_mode = attention_mode
         self.deterministic = False
         self.hidden_size = hidden_size
         self.heads_num = heads_num
@@ -369,6 +373,7 @@ class MMSingleStreamBlock(nn.Module):
                 q,
                 k,
                 v,
+                mode=self.attention_mode,
                 cu_seqlens_q=cu_seqlens_q,
                 cu_seqlens_kv=cu_seqlens_kv,
                 max_seqlen_q=max_seqlen_q,
@@ -467,6 +472,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
         use_attention_mask: bool = True,
         dtype: Optional[torch.dtype] = None,
         device: Optional[torch.device] = None,
+        attention_mode: Optional[str] = "flash"
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -550,6 +556,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
                     qk_norm=qk_norm,
                     qk_norm_type=qk_norm_type,
                     qkv_bias=qkv_bias,
+                    attention_mode = attention_mode,
                     **factory_kwargs,
                 )
                 for _ in range(mm_double_blocks_depth)
@@ -566,6 +573,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
                     mlp_act_type=mlp_act_type,
                     qk_norm=qk_norm,
                     qk_norm_type=qk_norm_type,
+                    attention_mode = attention_mode,
                     **factory_kwargs,
                 )
                 for _ in range(mm_single_blocks_depth)
