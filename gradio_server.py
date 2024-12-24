@@ -17,6 +17,7 @@ args = parse_args()
 
 
 force_profile_no = int(args.profile)
+verbose_level = int(args.verbose)
 
 transformer_choices=["ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_bf16.safetensors", "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_quanto_int8.safetensors", "ckpts/hunyuan-video-t2v-720p/transformers/fast_hunyuan_video_720_quanto_int8.safetensors"]
 text_encoder_choices = ["ckpts/text_encoder/llava-llama-3-8b-v1_1_fp16.safetensors", "ckpts/text_encoder/llava-llama-3-8b-v1_1_quanto_int8.safetensors"]
@@ -25,7 +26,7 @@ server_config_filename = "gradio_config.json"
 if not Path(server_config_filename).is_file():
     server_config = {"attention_mode" : "sdpa",  
                      "transformer_filename": transformer_choices[1], 
-                     "text_encoder_filename" : text_encoder_choices[0],
+                     "text_encoder_filename" : text_encoder_choices[1],
 
                      "profile" : profile_type.LowRAM_LowVRAM_Slow }
 
@@ -97,7 +98,7 @@ hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(transformer_filename
 
 pipe = hunyuan_video_sampler.pipeline
 
-offload.profile(pipe, profile_no= profile, quantizeTransformer = False)
+offload.profile(pipe, profile_no= profile, verboseLevel=verbose_level, quantizeTransformer = False)
 
 def apply_changes(
                     transformer_choice,

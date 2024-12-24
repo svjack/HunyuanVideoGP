@@ -26,9 +26,16 @@ def add_network_args(parser: argparse.ArgumentParser):
         "--profile",
         type=str,
         default=-1,
-        help="Profile No "
+        help="Profile No"
     )
-  
+
+    group.add_argument(
+        "--verbose",
+        type=str,
+        default=1,
+        help="Verbose level"
+    )
+
     # Main model
     group.add_argument(
         "--model",
