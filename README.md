@@ -74,12 +74,16 @@ python -m pip install sageattention==1.0.6
 
 ### Profiles
 You can choose between 5 profiles depending on your hardware:
-- HighRAM_HighVRAM_Fastest (0): at least 48 GB of RAM and 24 GB of VRAM : the fastest well suited for a RTX 3090 / RTX 4090
-- HighRAM_LowVRAM_Fast (1): at least 48 GB of RAM and 12 GB of VRAM : a bit slower, better suited for RTX 3070/3080/4070/4080 
+- HighRAM_HighVRAM_Fastest (1): at least 48 GB of RAM and 24 GB of VRAM : the fastest well suited for a RTX 3090 / RTX 4090
+- HighRAM_LowVRAM_Fast (2): at least 48 GB of RAM and 12 GB of VRAM : a bit slower, better suited for RTX 3070/3080/4070/4080 
             or for RTX 3090 / RTX 4090 with large pictures batches or long videos
-- LowRAM_HighVRAM_Medium (2): at least 32 GB of RAM and 24 GB of VRAM : so so speed but adapted for RTX 3090 / RTX 4090 with limited RAM
-- LowRAM_LowVRAM_Slow (3): at least 32 GB of RAM and 12 GB of VRAM :  if have little VRAM or generate longer videos 
-- VerylowRAM_LowVRAM_Slowest (4): at least 24 GB of RAM and 10 GB of VRAM : if you don't have much it won't be fast but maybe it will work
+- LowRAM_HighVRAM_Medium (3): at least 32 GB of RAM and 24 GB of VRAM : so so speed but adapted for RTX 3090 / RTX 4090 with limited RAM
+- LowRAM_LowVRAM_Slow (4): at least 32 GB of RAM and 12 GB of VRAM :  if you have little VRAM or generate longer videos 
+- VerylowRAM_LowVRAM_Slowest (5): at least 24 GB of RAM and 10 GB of VRAM : if you don't have much it won't be fast but maybe it will work
+
+If you use a Windows system, you will need 16 extra GB of RAM due to restrictions on available reserved memory.\
+A safe approach is to start from profile 5 or 4 and go down progressively to 1 as long as the app remains responsive or doesn't trigger any out of memory error.
+
 
 ### Run a Gradio Server on port 7860 (recommended)
 ```bash
