@@ -15,7 +15,7 @@
   [![Replicate](https://replicate.com/zsxkib/hunyuan-video/badge)](https://replicate.com/zsxkib/hunyuan-video)
 </div>
 
-
+01/04/2025! New version that leverages mmgp 3.0 (faster and even lower RAM requirements !)
 
 *GPU Poor version by **DeepBeepMeep**. This great video generator can now run smoothly on a 12 GB to 24 GB GPU.*
 
