@@ -186,6 +186,8 @@ class Inference(object):
 
         # =========================== Build main model ===========================
         logger.info("Building model...")
+        pinToMemory = kwargs.pop("pinToMemory")
+        partialPinning = kwargs.pop("partialPinning")        
 #        factor_kwargs = {"device": device, "dtype": PRECISION_TO_TYPE[args.precision]}
         factor_kwargs = kwargs | {"device": "meta", "dtype": PRECISION_TO_TYPE[args.precision]}
         in_channels = args.latent_channels
@@ -203,8 +205,7 @@ class Inference(object):
         logger.info(f"Loading torch model {pretrained_model_path}...")
 
         from mmgp import offload
-        offload.load_model_data(model, pretrained_model_path)
-
+        offload.load_model_data(model, pretrained_model_path, pinToMemory = pinToMemory, partialPinning = partialPinning)
 
         model.eval()
 

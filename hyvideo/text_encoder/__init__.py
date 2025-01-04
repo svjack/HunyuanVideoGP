@@ -181,7 +181,7 @@ class TextEncoder(nn.Module):
 
             from mmgp import offload
             
-            self.model= offload.fast_load_transformers_model(self.model_path)
+            self.model= offload.fast_load_transformers_model(self.model_path) #, pinInMemory = True, partialPinning = True
             self.model.final_layer_norm = self.model.norm
         
         else:

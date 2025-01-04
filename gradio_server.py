@@ -93,13 +93,22 @@ if vae_config["sample_tsize"] == 64:
 with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "w", encoding="utf-8") as writer:
     writer.write(json.dumps(vae_config))
 
-args.flow_reverse = True    
-hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(transformer_filename, text_encoder_filename, attention_mode = attention_mode, args=args,  device="cpu") 
+args.flow_reverse = True
+if profile == 5:
+    pinToMemory = False
+    partialPinning = False
+else:    
+    pinToMemory =  True
+    import psutil
+    physical_memory= psutil.virtual_memory().total    
+    partialPinning = physical_memory <= 2**30 * 32 
+
+hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(transformer_filename, text_encoder_filename, attention_mode = attention_mode, pinToMemory = pinToMemory, partialPinning = partialPinning,  args=args,  device="cpu") 
 
 pipe = hunyuan_video_sampler.pipeline
 
-offload.profile(pipe, profile_no= profile, verboseLevel=verbose_level, quantizeTransformer = False)
-
+offload.profile(pipe, profile_no= profile, verboseLevel=verbose_level, quantizeTransformer = True) 
+ 
 def apply_changes(
                     transformer_choice,
                     text_encoder_choice,
