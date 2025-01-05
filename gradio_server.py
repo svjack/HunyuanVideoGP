@@ -27,8 +27,8 @@ if not Path(server_config_filename).is_file():
     server_config = {"attention_mode" : "sdpa",  
                      "transformer_filename": transformer_choices[1], 
                      "text_encoder_filename" : text_encoder_choices[1],
-
-                     "profile" : profile_type.LowRAM_LowVRAM_Slow }
+                     "compile" : "",
+                     "profile" : profile_type.LowRAM_LowVRAM }
 
     with open(server_config_filename, "w", encoding="utf-8") as writer:
         writer.write(json.dumps(server_config))
@@ -41,7 +41,7 @@ transformer_filename = server_config["transformer_filename"]
 text_encoder_filename = server_config["text_encoder_filename"]
 attention_mode = server_config["attention_mode"]
 profile =  force_profile_no if force_profile_no >=0 else server_config["profile"]
-
+compile = server_config.get("compile", "")
 
 #transformer_filename = "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_bf16.safetensors"
 #transformer_filename = "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_quanto_int8.safetensors"
@@ -83,7 +83,7 @@ download_models(transformer_filename, text_encoder_filename)
 # if not models_root_path.exists():
 #     raise ValueError(f"`models_root` not exists: {models_root_path}")
 
-
+offload.default_verboseLevel = verbose_level
 with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "r", encoding="utf-8") as reader:
     text = reader.read()
 vae_config= json.loads(text)
@@ -107,23 +107,25 @@ hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(transformer_filename
 
 pipe = hunyuan_video_sampler.pipeline
 
-offload.profile(pipe, profile_no= profile, verboseLevel=verbose_level, quantizeTransformer = True) 
+offload.profile(pipe, profile_no= profile, compile = compile, quantizeTransformer = False) 
  
 def apply_changes(
                     transformer_choice,
                     text_encoder_choice,
                     attention_choice,
+                    compile_choice,
                     profile_choice,
 ):
     server_config = {"attention_mode" : attention_choice,  
                      "transformer_filename": transformer_choices[transformer_choice], 
                      "text_encoder_filename" : text_encoder_choices[text_encoder_choice],
+                     "compile" : compile_choice,
                      "profile" : profile_choice }
 
     with open(server_config_filename, "w", encoding="utf-8") as writer:
         writer.write(json.dumps(server_config))
 
-    return "<h1>New Config file created. Please restart the Gradio  Server</h1>"
+    return "<h1>New Config file created. Please restart the Gradio Server</h1>"
 
 
 from moviepy.editor import ImageSequenceClip
@@ -193,10 +195,11 @@ def create_demo(model_path, save_path):
     with gr.Blocks() as demo:
         gr.Markdown("<div align=center><H1>HunyuanVideo<SUP>GP</SUP> by Tencent</H3></div>")
         gr.Markdown("*GPU Poor version by **DeepBeepMeep**. Now this great video generator can run smoothly on a 24 GB rig.*")
-        gr.Markdown("Please be aware of these limits with the Fast profile if you have 24 GB of VRAM (RTX 3090 / RTX 4090):")
+        gr.Markdown("Please be aware of these limits with profiles 2 and 4 if you have 24 GB of VRAM (RTX 3090 / RTX 4090):")
         gr.Markdown("- max 192 frames for 848 x 480 ")
         gr.Markdown("- max 86 frames for 1280 x 720")
         gr.Markdown("In the worst case, one step should not take more than 2 minutes. If it the case you may be running out of RAM / VRAM. Try to generate fewer images / lower res / a less demanding profile.")
+        gr.Markdown("If you have a Linux / WSL system you may turn on compilation (see below) and will be able to generate an extra 30°% frames")
 
         with gr.Accordion("Video Engine Configuration", open = False):
             gr.Markdown("For the changes to be effective you will need to restart the gradio_server")
@@ -229,19 +232,28 @@ def create_demo(model_path, save_path):
                 attention_choice = gr.Dropdown(
                     choices=[
                         ("Scale Dot Product Attention: default", "sdpa"),
-                        ("Flash: good quality - requires additional install", "flash"),
-                        ("Sage: 30% faster but worse quality - requires additional install", "sage"),
+                        ("Flash: good quality - requires additional install (usually complex to set up on Windows without WSL)", "flash"),
+                        ("Sage: 30% faster but worse quality - requires additional install (usually complex to set up on Windows without WSL)", "sage"),
                     ],
                     value= attention_mode,
                     label="Attention Type"
                  )
+                gr.Markdown("Beware: restarting the server or changing a resolution or video duration will trigger a recompilation that may last a few minutes")
+                compile_choice = gr.Dropdown(
+                    choices=[
+                        ("ON: works only on Linux / WSL", "transformer"),
+                        ("OFF: no other choice if you have Windows without using WSL", "" ),
+                    ],
+                    value= compile,
+                    label="Compile Transformer (up to 50% faster and 30% more frames but requires Linux / WSL and Flash or Sage attention)"
+                 )                
                 profile_choice = gr.Dropdown(
                     choices=[
-                ("HighRAM_HighVRAM_Fastest: at least 48 GB of RAM and 24 GB of VRAM : the fastest well suited for a RTX 3090 / RTX 4090", 1),
-                ("HighRAM_LowVRAM_Fast: at least 48 GB of RAM and 12 GB of VRAM : a bit slower, better suited for RTX 3070/3080/4070/4080 or for RTX 3090 / RTX 4090 with large pictures batches or long videos", 2),
-                ("LowRAM_HighVRAM_Medium: at least 32 GB of RAM and 24 GB of VRAM : so so speed but adapted for RTX 3090 / RTX 4090 with limited RAM",3),
-                ("LowRAM_LowVRAM_Slow: at least 32 GB of RAM and 12 GB of VRAM : if have little VRAM or generate longer videos",4),
-                ("VerylowRAM_LowVRAM_Slowest: at least 16 GB of RAM and 10 GB of VRAM : if you don't have much it won't be fast but maybe it will work",5)
+                ("HighRAM_HighVRAM, profile 1: at least 48 GB of RAM and 24 GB of VRAM, the fastest for shorter videos a RTX 3090 / RTX 4090", 1),
+                ("HighRAM_LowVRAM, profile 2 (Recommended): at least 48 GB of RAM and 12 GB of VRAM, the most versatile profile with high RAM, better suited for RTX 3070/3080/4070/4080 or for RTX 3090 / RTX 4090 with large pictures batches or long videos", 2),
+                ("LowRAM_HighVRAM, profile 3: at least 32 GB of RAM and 24 GB of VRAM, adapted for RTX 3090 / RTX 4090 with limited RAM for good speed short video",3),
+                ("LowRAM_LowVRAM, profile 4 (Default): at least 32 GB of RAM and 12 GB of VRAM, if you have little VRAM or want to generate longer videos",4),
+                ("VerylowRAM_LowVRAM, profile 5: (Fail safe): at least 16 GB of RAM and 10 GB of VRAM, if you don't have much it won't be fast but maybe it will work",5)
                     ],
                     value= profile,
                     label="Profile"
@@ -257,6 +269,7 @@ def create_demo(model_path, save_path):
                             transformer_choice,
                             text_encoder_choice,
                             attention_choice,
+                            compile_choice,                            
                             profile_choice,
                         ],
                         outputs=msg

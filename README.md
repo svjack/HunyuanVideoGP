@@ -15,13 +15,15 @@
   [![Replicate](https://replicate.com/zsxkib/hunyuan-video/badge)](https://replicate.com/zsxkib/hunyuan-video)
 </div>
 
-01/04/2025! New version that leverages mmgp 3.0 (faster and even lower RAM requirements !)
+01/04/2025: Version 2.0 Full leverage of mmgp 3.0 (faster and even lower RAM requirements ! + support for compilation on Linux and WSL)
+22/12/2024: Version 1.0 First release
 
 *GPU Poor version by **DeepBeepMeep**. This great video generator can now run smoothly on a 12 GB to 24 GB GPU.*
 
 This version has the following improvements over the original Hunyuan Video model:
 - Reduce greatly the RAM requirements and VRAM requirements
-- 5 profiles in order to able to run the model at a decent speed on a low end consumer config (32 GB of RAM and 12 VRAM) and to run it at a very good speed on a high end consumer config (48 GB of RAM and 24 GB of VRAM) 
+- Much faster thanks to compilation and fast loading / unloading
+- 5 profiles in order to able to run the model at a decent speed on a low end consumer config (32 GB of RAM and 12 VRAM) and to run it at a very good speed on a high end consumer config (48 GB of RAM and 24 GB of VRAM)
 - Autodownloading of the needed model files
 - Improved gradio interface with progression bar and more options
 - Switch easily between Hunyuan and Fast Hunyuan models and quantized / non quantized models
@@ -74,15 +76,14 @@ python -m pip install sageattention==1.0.6
 
 ### Profiles
 You can choose between 5 profiles depending on your hardware:
-- HighRAM_HighVRAM_Fastest (1): at least 48 GB of RAM and 24 GB of VRAM : the fastest well suited for a RTX 3090 / RTX 4090
-- HighRAM_LowVRAM_Fast (2): at least 48 GB of RAM and 12 GB of VRAM : a bit slower, better suited for RTX 3070/3080/4070/4080 
-            or for RTX 3090 / RTX 4090 with large pictures batches or long videos
-- LowRAM_HighVRAM_Medium (3): at least 32 GB of RAM and 24 GB of VRAM : so so speed but adapted for RTX 3090 / RTX 4090 with limited RAM
-- LowRAM_LowVRAM_Slow (4): at least 32 GB of RAM and 12 GB of VRAM :  if you have little VRAM or generate longer videos 
-- VerylowRAM_LowVRAM_Slowest (5): at least 24 GB of RAM and 10 GB of VRAM : if you don't have much it won't be fast but maybe it will work
+- HighRAM_HighVRAM  (1): at least 48 GB of RAM and 24 GB of VRAM : the fastest well suited for a RTX 3090 / RTX 4090 but consumes much more VRAM, adapted for fast shorter video
+- HighRAM_LowVRAM  (2): at least 48 GB of RAM and 12 GB of VRAM : a bit slower, better suited for RTX 3070/3080/4070/4080 or for RTX 3090 / RTX 4090 with large pictures batches or long videos
+- LowRAM_HighVRAM  (3): at least 32 GB of RAM and 24 GB of VRAM : adapted for RTX 3090 / RTX 4090 with limited RAM  but at the cost of VRAM (shorter videos)
+- LowRAM_LowVRAM  (4): at least 32 GB of RAM and 12 GB of VRAM :  if you have little VRAM or want to generate longer videos 
+- VerylowRAM_LowVRAM  (5): at least 24 GB of RAM and 10 GB of VRAM : if you don't have much it won't be fast but maybe it will work
 
-If you use a Windows system, you will need 16 extra GB of RAM due to restrictions on available reserved memory.\
-A safe approach is to start from profile 5 or 4 and go down progressively to 1 as long as the app remains responsive or doesn't trigger any out of memory error.
+Profile 2 (High RAM) and 4 (Low RAM)are the most recommended profiles since they are versatile (support for long videos for a slight performance cost).\
+However, a safe approach is to start from profile 5 (default profile) and then go down progressively to profile 4 and then to profile 2 as long as the app remains responsive or doesn't trigger any out of memory error.
 
 
 ### Run a Gradio Server on port 7860 (recommended)
@@ -91,9 +92,9 @@ python3 gradio_server.py
 ```
 
 You will have the possibility to configure a RAM / VRAM profile by expanding the section *Video Engine Configuration* in the Web Interface.\
-If by mistake you have chosen a configuration not supported by your system, you can force a profile while loading the app with safe profile values such as 4 or 5:  
+If by mistake you have chosen a configuration not supported by your system, you can force a profile while loading the app with the safe profile 5:  
 ```bash
-python3 gradio_server.py --profile 4
+python3 gradio_server.py --profile 5
 ```
 
 
