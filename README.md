@@ -15,8 +15,9 @@
   [![Replicate](https://replicate.com/zsxkib/hunyuan-video/badge)](https://replicate.com/zsxkib/hunyuan-video)
 </div>
 
-01/04/2025: Version 2.0 Full leverage of mmgp 3.0 (faster and even lower RAM requirements ! + support for compilation on Linux and WSL)
-22/12/2024: Version 1.0 First release
+06/04/2025: Version 2.1 Integrated Tea Cache (https://github.com/ali-vilab/TeaCache) for even faster generations\
+01/04/2025: Version 2.0 Full leverage of mmgp 3.0 (faster and even lower RAM requirements ! + support for compilation on Linux and WSL)\
+22/12/2024: Version 1.0 First release\
 
 *GPU Poor version by **DeepBeepMeep**. This great video generator can now run smoothly on a 12 GB to 24 GB GPU.*
 
@@ -48,7 +49,7 @@ We conducted extensive experiments and implemented a series of targeted designs 
 
 
 
-### Installation Guide for Linux
+### Installation Guide for Linux and Windows
 
 We provide an `environment.yml` file for setting up a Conda environment.
 Conda's installation instructions are available [here](https://docs.anaconda.com/free/miniconda/index.html).

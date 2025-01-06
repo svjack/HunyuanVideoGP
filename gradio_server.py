@@ -147,6 +147,7 @@ def generate_video(
     guidance_scale,
     flow_shift,
     embedded_guidance_scale,
+    tea_cache,
     progress=gr.Progress(track_tqdm=True)
 
 ):
@@ -154,6 +155,19 @@ def generate_video(
     width, height = resolution.split("x")
     width, height = int(width), int(height)
     negative_prompt = "" # not applicable in the inference
+
+
+   # TeaCache
+    trans = hunyuan_video_sampler.pipeline.transformer.__class__
+    trans.enable_teacache = tea_cache > 0
+    if trans.enable_teacache:
+        trans.num_steps = num_inference_steps
+        trans.cnt = 0
+        trans.rel_l1_thresh = 0.15 # 0.1 for 1.6x speedup, 0.15 for 2.1x speedup
+        trans.accumulated_rel_l1_distance = 0
+        trans.previous_modulated_input = None
+        trans.previous_residual = None
+
 
     outputs = hunyuan_video_sampler.predict(
         prompt=prompt,
@@ -319,6 +333,17 @@ def create_demo(model_path, save_path):
                         guidance_scale = gr.Slider(1.0, 20.0, value=1.0, step=0.5, label="Guidance Scale")
                         flow_shift = gr.Slider(0.0, 25.0, value=7.0, step=0.1, label="Flow Shift") 
                         embedded_guidance_scale = gr.Slider(1.0, 20.0, value=6.0, step=0.5, label="Embedded Guidance Scale")
+                with gr.Row():
+                    tea_cache_setting = gr.Dropdown(
+                        choices=[
+                            ("Disabled", 0),
+                            ("Fast (x1.6 speed up)", 0.1), 
+                            ("Faster (x2.1 speed up)", 0.15), 
+                        ],
+                        value=0,
+                        label="Tea Cache acceleration (the faster the acceleration the higher the degradation of the quality of the video)"
+                    )
+
                 show_advanced.change(fn=lambda x: gr.Row(visible=x), inputs=[show_advanced], outputs=[advanced_row])
                 generate_btn = gr.Button("Generate")
             
@@ -335,7 +360,8 @@ def create_demo(model_path, save_path):
                 num_inference_steps,
                 guidance_scale,
                 flow_shift,
-                embedded_guidance_scale
+                embedded_guidance_scale,
+                tea_cache_setting
             ],
             outputs=output
         )
