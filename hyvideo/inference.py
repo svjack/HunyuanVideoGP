@@ -183,11 +183,10 @@ class Inference(object):
 
         # Disable gradient
         torch.set_grad_enabled(False)
-
         # =========================== Build main model ===========================
         logger.info("Building model...")
-        pinToMemory = kwargs.pop("pinToMemory")
-        partialPinning = kwargs.pop("partialPinning")        
+        pinToMemory = kwargs.pop("pinToMemory", False)
+        partialPinning = kwargs.pop("partialPinning", False)        
 #        factor_kwargs = {"device": device, "dtype": PRECISION_TO_TYPE[args.precision]}
         factor_kwargs = kwargs | {"device": "meta", "dtype": PRECISION_TO_TYPE[args.precision]}
         in_channels = args.latent_channels
@@ -199,9 +198,6 @@ class Inference(object):
             out_channels=out_channels,
             factor_kwargs=factor_kwargs,
         )
-#        model = model.to(device)
-#        model = Inference.load_state_dict(args, model, pretrained_model_path)
-
         logger.info(f"Loading torch model {pretrained_model_path}...")
 
         from mmgp import offload
@@ -650,6 +646,9 @@ class HunyuanVideoSampler(Inference):
        embedded_guidance_scale: {embedded_guidance_scale}"""
         logger.debug(debug_str)
 
+        callback = kwargs.pop("callback", None)
+        callback_steps = kwargs.pop("callback_steps", None)
+
         # ========================================================================
         # Pipeline inference
         # ========================================================================
@@ -672,6 +671,8 @@ class HunyuanVideoSampler(Inference):
             is_progress_bar=True,
             vae_ver=self.args.vae,
             enable_tiling=self.args.vae_tiling,
+            callback = callback,
+            callback_steps = callback_steps,
         )[0]
         out_dict["samples"] = samples
         out_dict["prompts"] = prompt

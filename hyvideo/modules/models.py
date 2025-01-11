@@ -400,6 +400,13 @@ class MMSingleStreamBlock(nn.Module):
 
         # Compute activation in mlp stream, cat again and run second linear layer.
         output = self.linear2(torch.cat((attn, self.mlp_act(mlp)), 2))
+        # reduce VRAM consumption by destroying intermediate tensors no longer needed
+        # mlp = self.mlp_act(mlp)
+        # attn_mlp = torch.cat((attn, mlp), 2)
+        # del attn
+        # del mlp
+        # output = self.linear2(attn_mlp)
+        # del attn_mlp
         return x + apply_gate(output, gate=mod_gate)
 
 

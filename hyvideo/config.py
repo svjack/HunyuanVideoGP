@@ -22,6 +22,28 @@ def parse_args(namespace=None):
 def add_network_args(parser: argparse.ArgumentParser):
     group = parser.add_argument_group(title="HunyuanVideo network args")
 
+
+    group.add_argument(
+        "--quantize-transformer",
+        action="store_true",
+        help="On the fly 'transformer' quantization"
+    )
+
+
+    group.add_argument(
+        "--lora-weight",
+        nargs='+',
+        default=[],
+        help="List of Lora Path to Weights"
+    )
+
+    group.add_argument(
+        "--lora-multiplier",
+        nargs='+',
+        default=[],
+        help="List of Lora multipliers"
+    )
+
     group.add_argument(
         "--profile",
         type=str,
@@ -34,6 +56,26 @@ def add_network_args(parser: argparse.ArgumentParser):
         type=str,
         default=1,
         help="Verbose level"
+    )
+
+    group.add_argument(
+        "--server-port",
+        type=str,
+        default=0,
+        help="Server port"
+    )
+
+    group.add_argument(
+        "--server-name",
+        type=str,
+        default="",
+        help="Server name"
+    )
+
+    group.add_argument(
+        "--open-browser",
+        action="store_true",
+        help="open browser"
     )
 
     # Main model

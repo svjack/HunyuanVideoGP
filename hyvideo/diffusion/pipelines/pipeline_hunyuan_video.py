@@ -581,9 +581,17 @@ class HunyuanVideoPipeline(DiffusionPipeline):
             )
 
         if latents is None:
-            latents = randn_tensor(
-                shape, generator=generator, device=device, dtype=dtype
-            )
+            # latents = randn_tensor(
+            #     shape, generator=generator, device=device, dtype=dtype
+            # )
+            # make first N frames to be the same ####################################
+            shape_or_frame = (1, num_channels_latents, 1, height // self.vae_scale_factor, width // self.vae_scale_factor)
+            latents = []
+            for i in range(video_length):
+                latents.append(randn_tensor(shape_or_frame, generator=generator, device=device, dtype=dtype))
+            latents = torch.cat(latents, dim=2)
+
+
         else:
             latents = latents.to(device)
 
@@ -786,18 +794,18 @@ class HunyuanVideoPipeline(DiffusionPipeline):
         callback = kwargs.pop("callback", None)
         callback_steps = kwargs.pop("callback_steps", None)
 
-        if callback is not None:
-            deprecate(
-                "callback",
-                "1.0.0",
-                "Passing `callback` as an input argument to `__call__` is deprecated, consider using `callback_on_step_end`",
-            )
-        if callback_steps is not None:
-            deprecate(
-                "callback_steps",
-                "1.0.0",
-                "Passing `callback_steps` as an input argument to `__call__` is deprecated, consider using `callback_on_step_end`",
-            )
+        # if callback is not None:
+        #     deprecate(
+        #         "callback",
+        #         "1.0.0",
+        #         "Passing `callback` as an input argument to `__call__` is deprecated, consider using `callback_on_step_end`",
+        #     )
+        # if callback_steps is not None:
+        #     deprecate(
+        #         "callback_steps",
+        #         "1.0.0",
+        #         "Passing `callback_steps` as an input argument to `__call__` is deprecated, consider using `callback_on_step_end`",
+        #     )
 
         if isinstance(callback_on_step_end, (PipelineCallback, MultiPipelineCallbacks)):
             callback_on_step_end_tensor_inputs = callback_on_step_end.tensor_inputs
@@ -956,6 +964,9 @@ class HunyuanVideoPipeline(DiffusionPipeline):
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         self._num_timesteps = len(timesteps)
 
+        if callback != None:
+            callback(-1, None, None)
+
         # if is_progress_bar:
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
@@ -1047,6 +1058,9 @@ class HunyuanVideoPipeline(DiffusionPipeline):
                         step_idx = i // getattr(self.scheduler, "order", 1)
                         callback(step_idx, t, latents)
 
+        if self.interrupt:
+            return [None]
+        
         if not output_type == "latent":
             expand_temporal_dim = False
             if len(latents.shape) == 4:
