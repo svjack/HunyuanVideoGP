@@ -120,7 +120,7 @@ You can find prebuilt Loras on https://civitai.com/ or build them with tools suc
 One of the best open source Text to Video generator
 
 - FluxFillGP: https://github.com/deepbeepmeep/FluxFillGP
-One of the best inpainting / outpaing tools based on Flux that can run with less than 12 GB of VRAM.
+One of the best inpainting / outpainting tools based on Flux that can run with less than 12 GB of VRAM.
 
 - Cosmos1GP: https://github.com/deepbeepmeep/Cosmos1GP
 This application include two models: a text to world generator and a image / video to world (probably the best open source image to video generator).
