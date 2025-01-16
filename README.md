@@ -114,7 +114,21 @@ You can find prebuilt Loras on https://civitai.com/ or build them with tools suc
 --server-port portno : default (7860) : Gradio port no\
 --server-name name : default (0.0.0.0) : Gradio server name\
 --open-browser : open automatically Browser when launching Gradio Server\
- 
+
+### Other Models for the GPU Poor
+- HuanyuanVideoGP: https://github.com/deepbeepmeep/HunyuanVideoGP
+One of the best open source Text to Video generator
+
+- FluxFillGP: https://github.com/deepbeepmeep/FluxFillGP
+One of the best inpainting / outpaing tools based on Flux that can run with less than 12 GB of VRAM.
+
+- Cosmos1GP: https://github.com/deepbeepmeep/Cosmos1GP
+This application include two models: a text to world generator and a image / video to world (probably the best open source image to video generator).
+
+
+
+
+
 ### Run through the command line
 ```bash
 cd HunyuanVideo

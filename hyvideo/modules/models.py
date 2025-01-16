@@ -165,14 +165,18 @@ class MMDoubleStreamBlock(nn.Module):
         img_modulated = modulate(
             img_modulated, shift=img_mod1_shift, scale=img_mod1_scale
         )
-        img_qkv = self.img_attn_qkv(img_modulated)
+        img_qkv = self.img_attn_qkv(img_modulated)        
+        del img_modulated
         img_q, img_k, img_v = rearrange(
             img_qkv, "B L (K H D) -> K B L H D", K=3, H=self.heads_num
         )
+        del img_qkv
         # Apply QK-Norm if needed
         img_q = self.img_attn_q_norm(img_q).to(img_v)
+        img_q_len = img_q.shape[1]
         img_k = self.img_attn_k_norm(img_k).to(img_v)
-
+        img_kv_len= img_k.shape[1]        
+        batch_size = img_k.shape[0]
         # Apply RoPE if needed.
         if freqs_cis is not None:
             img_qq, img_kk = apply_rotary_emb(img_q, img_k, freqs_cis, head_first=False)
@@ -180,24 +184,30 @@ class MMDoubleStreamBlock(nn.Module):
                 img_qq.shape == img_q.shape and img_kk.shape == img_k.shape
             ), f"img_kk: {img_qq.shape}, img_q: {img_q.shape}, img_kk: {img_kk.shape}, img_k: {img_k.shape}"
             img_q, img_k = img_qq, img_kk
-
+            del img_qq, img_kk
         # Prepare txt for attention.
         txt_modulated = self.txt_norm1(txt)
         txt_modulated = modulate(
             txt_modulated, shift=txt_mod1_shift, scale=txt_mod1_scale
         )
         txt_qkv = self.txt_attn_qkv(txt_modulated)
+        del txt_modulated
         txt_q, txt_k, txt_v = rearrange(
             txt_qkv, "B L (K H D) -> K B L H D", K=3, H=self.heads_num
         )
+        del txt_qkv
         # Apply QK-Norm if needed.
         txt_q = self.txt_attn_q_norm(txt_q).to(txt_v)
         txt_k = self.txt_attn_k_norm(txt_k).to(txt_v)
 
         # Run actual attention.
         q = torch.cat((img_q, txt_q), dim=1)
+        del img_q, txt_q
         k = torch.cat((img_k, txt_k), dim=1)
+        
+        del img_k, txt_k
         v = torch.cat((img_v, txt_v), dim=1)
+        del img_v, txt_v
         # assert (
         #     cu_seqlens_q.shape[0] == 2 * img.shape[0] + 1
         # ), f"cu_seqlens_q.shape:{cu_seqlens_q.shape}, img.shape[0]:{img.shape[0]}"
@@ -214,7 +224,7 @@ class MMDoubleStreamBlock(nn.Module):
                 cu_seqlens_kv=cu_seqlens_kv,
                 max_seqlen_q=max_seqlen_q,
                 max_seqlen_kv=max_seqlen_kv,
-                batch_size=img_k.shape[0],
+                batch_size=batch_size,
             )
         else:
             attn = parallel_attention(
@@ -222,8 +232,8 @@ class MMDoubleStreamBlock(nn.Module):
                 q,
                 k,
                 v,
-                img_q_len=img_q.shape[1],
-                img_kv_len=img_k.shape[1],
+                img_q_len= img_q_len,
+                img_kv_len= img_kv_len,
                 cu_seqlens_q=cu_seqlens_q,
                 cu_seqlens_kv=cu_seqlens_kv
             )
@@ -231,9 +241,10 @@ class MMDoubleStreamBlock(nn.Module):
         # attention computation end
 
         img_attn, txt_attn = attn[:, : img.shape[1]], attn[:, img.shape[1] :]
-
+        del attn
         # Calculate the img bloks.
         img = img + apply_gate(self.img_attn_proj(img_attn), gate=img_mod1_gate)
+        del img_attn
         img = img + apply_gate(
             self.img_mlp(
                 modulate(
@@ -245,6 +256,7 @@ class MMDoubleStreamBlock(nn.Module):
 
         # Calculate the txt bloks.
         txt = txt + apply_gate(self.txt_attn_proj(txt_attn), gate=txt_mod1_gate)
+        del txt_attn
         txt = txt + apply_gate(
             self.txt_mlp(
                 modulate(
@@ -347,8 +359,11 @@ class MMSingleStreamBlock(nn.Module):
         qkv, mlp = torch.split(
             self.linear1(x_mod), [3 * self.hidden_size, self.mlp_hidden_dim], dim=-1
         )
+        batch_size = x.shape[0]        
+        del x_mod
 
         q, k, v = rearrange(qkv, "B L (K H D) -> K B L H D", K=3, H=self.heads_num)
+        del qkv
 
         # Apply QK-Norm if needed.
         q = self.q_norm(q).to(v)
@@ -365,7 +380,9 @@ class MMSingleStreamBlock(nn.Module):
             img_q, img_k = img_qq, img_kk
             q = torch.cat((img_q, txt_q), dim=1)
             k = torch.cat((img_k, txt_k), dim=1)
-
+            img_q_len=img_q.shape[1]
+            img_kv_len=img_k.shape[1]
+            del img_q, txt_q, img_k, txt_k
         # Compute attention.
         # assert (
         #     cu_seqlens_q.shape[0] == 2 * x.shape[0] + 1
@@ -383,7 +400,7 @@ class MMSingleStreamBlock(nn.Module):
                 cu_seqlens_kv=cu_seqlens_kv,
                 max_seqlen_q=max_seqlen_q,
                 max_seqlen_kv=max_seqlen_kv,
-                batch_size=x.shape[0],
+                batch_size=batch_size,
             )
         else:
             attn = parallel_attention(
@@ -391,22 +408,22 @@ class MMSingleStreamBlock(nn.Module):
                 q,
                 k,
                 v,
-                img_q_len=img_q.shape[1],
-                img_kv_len=img_k.shape[1],
+                img_q_len=img_q_len,
+                img_kv_len=img_kv_len,
                 cu_seqlens_q=cu_seqlens_q,
                 cu_seqlens_kv=cu_seqlens_kv
             )
         # attention computation end
 
         # Compute activation in mlp stream, cat again and run second linear layer.
-        output = self.linear2(torch.cat((attn, self.mlp_act(mlp)), 2))
+        # output = self.linear2(torch.cat((attn, self.mlp_act(mlp)), 2))
         # reduce VRAM consumption by destroying intermediate tensors no longer needed
-        # mlp = self.mlp_act(mlp)
-        # attn_mlp = torch.cat((attn, mlp), 2)
-        # del attn
-        # del mlp
-        # output = self.linear2(attn_mlp)
-        # del attn_mlp
+        mlp = self.mlp_act(mlp)
+        attn_mlp = torch.cat((attn, mlp), 2)
+        del attn
+        del mlp
+        output = self.linear2(attn_mlp)
+        del attn_mlp
         return x + apply_gate(output, gate=mod_gate)
 
 

@@ -1,5 +1,9 @@
 import os
 import time
+try:
+    import triton
+except ImportError:
+    pass
 from pathlib import Path
 from loguru import logger
 from datetime import datetime
@@ -82,9 +86,6 @@ def download_models(transformer_filename, text_encoder_filename):
 
 download_models(transformer_filename, text_encoder_filename) 
 
-# models_root_path = Path(args.model_base)
-# if not models_root_path.exists():
-#     raise ValueError(f"`models_root` not exists: {models_root_path}")
 
 offload.default_verboseLevel = verbose_level
 with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "r", encoding="utf-8") as reader:
@@ -109,6 +110,8 @@ else:
 
 hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(transformer_filename, text_encoder_filename, attention_mode = attention_mode, pinToMemory = pinToMemory, partialPinning = partialPinning, args=args,  device="cpu") 
 pipe = hunyuan_video_sampler.pipeline
+
+#compile = "transformer"
 
 # lora_weight =["ckpts/arny_lora.safetensors"]
 # lora_multi = [1.0]
@@ -170,10 +173,11 @@ def refresh_gallery(state):
     return file_list
         
 def finalize_gallery(state):
+    choice = 0
     if "in_progress" in state:
         del state["in_progress"]
-    choice = state.get("selected",0)
-
+        choice = state.get("selected",0)
+    time.sleep(0.2)
     return gr.Gallery(selected_index=choice), gr.Button(interactive=  True)
 
 def select_video(state , event_data: gr.EventData):
@@ -300,12 +304,12 @@ def generate_video(
 def create_demo(model_path, save_path):
     
     with gr.Blocks() as demo:
-        gr.Markdown("<div align=center><H1>HunyuanVideo<SUP>GP</SUP> by Tencent</H3></div>")
-        gr.Markdown("*GPU Poor version by **DeepBeepMeep**. Now this great video generator can run smoothly on a 24 GB rig.*")
+        gr.Markdown("<div align=center><H1>HunyuanVideo<SUP>GP</SUP></H3></div>")
+        gr.Markdown("*Original model by Tencent, GPU Poor version by DeepBeepMeep. Now this great video generator can run smoothly on a 24 GB rig.*")
         gr.Markdown("Please be aware of these limits with profiles 2 and 4 if you have 24 GB of VRAM (RTX 3090 / RTX 4090):")
         gr.Markdown("- max 192 frames for 848 x 480 ")
         gr.Markdown("- max 86 frames for 1280 x 720")
-        gr.Markdown("In the worst case, one step should not take more than 2 minutes. If it the case you may be running out of RAM / VRAM. Try to generate fewer images / lower res / a less demanding profile.")
+        gr.Markdown("In the worst case, one step should not take more than 2 minutes. If it is the case you may be running out of RAM / VRAM. Try to generate fewer images / lower res / a less demanding profile.")
         gr.Markdown("If you have a Linux / WSL system you may turn on compilation (see below) and will be able to generate an extra 30°% frames")
 
         with gr.Accordion("Video Engine Configuration", open = False):
@@ -425,7 +429,7 @@ def create_demo(model_path, save_path):
                         guidance_scale = gr.Slider(1.0, 20.0, value=1.0, step=0.5, label="Guidance Scale")
                         flow_shift = gr.Slider(0.0, 25.0, value=7.0, step=0.1, label="Flow Shift") 
                         embedded_guidance_scale = gr.Slider(1.0, 20.0, value=6.0, step=0.5, label="Embedded Guidance Scale")
-                        repeat_generation = gr.Slider(1, 25.0, value=1.0, step=1, label="Number of Generated Video per prompt multiple video per prompt") 
+                        repeat_generation = gr.Slider(1, 25.0, value=1.0, step=1, label="Number of Generated Video per prompt") 
                         tea_cache_setting = gr.Dropdown(
                             choices=[
                                 ("Disabled", 0),
