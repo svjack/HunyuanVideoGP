@@ -1,4 +1,4 @@
-name: HunyuanVideo
+name: HunyuanVideoGP
 channels:
   - pytorch
   - nvidia
