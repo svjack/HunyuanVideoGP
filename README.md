@@ -3,7 +3,7 @@
 [中文阅读](./README_zh.md)
 
 
-# HunyuanVideo: A Systematic Framework For Large Video Generation Model
+# HunyuanVideoGP: Large Video Generation for the GPU Poor
 <div align="center">
   <a href="https://github.com/Tencent/HunyuanVideo"><img src="https://img.shields.io/static/v1?label=HunyuanVideo Code&message=Github&color=blue&logo=github-pages"></a> &ensp;
   <a href="https://aivideo.hunyuan.tencent.com"><img src="https://img.shields.io/static/v1?label=Project%20Page&message=Web&color=green&logo=github-pages"></a> &ensp;
@@ -11,15 +11,19 @@
   <a href="https://arxiv.org/abs/2412.03603"><img src="https://img.shields.io/static/v1?label=Tech Report&message=Arxiv:HunyuanVideo&color=red&logo=arxiv"></a> &ensp;
   <a href="https://huggingface.co/tencent/HunyuanVideo"><img src="https://img.shields.io/static/v1?label=HunyuanVideo&message=HuggingFace&color=yellow"></a> &ensp; &ensp;
   <a href="https://huggingface.co/tencent/HunyuanVideo-PromptRewrite"><img src="https://img.shields.io/static/v1?label=HunyuanVideo-PromptRewrite&message=HuggingFace&color=yellow"></a> &ensp; &ensp;
-
   [![Replicate](https://replicate.com/zsxkib/hunyuan-video/badge)](https://replicate.com/zsxkib/hunyuan-video)
 </div>
-01/21/2025: Version 3.1 Ability to define a Loras directory and turn on / off any Lora when running the application\
-01/11/2025: Version 3.0 Multiple prompts / multiple generations per prompt, new progression bar, support for pretrained Loras\
-01/06/2025: Version 2.1 Integrated Tea Cache (https://github.com/ali-vilab/TeaCache) for even faster generations\
-01/04/2025: Version 2.0 Full leverage of mmgp 3.0 (faster and even lower RAM requirements ! + support for compilation on Linux and WSL)\
-12/22/2024: Version 1.0 First release\
+<p align="center">
 
+
+## News
+* 01/21/2025: Version 3.1 Ability to define a Loras directory and turn on / off any Lora when running the application
+* 01/11/2025: Version 3.0 Multiple prompts / multiple generations per prompt, new progression bar, support for pretrained Loras
+* 01/06/2025: Version 2.1 Integrated Tea Cache (https://github.com/ali-vilab/TeaCache) for even faster generations
+* 01/04/2025: Version 2.0 Full leverage of mmgp 3.0 (faster and even lower RAM requirements ! + support for compilation on Linux and WSL)
+* 12/22/2024: Version 1.0 First release
+
+## Features
 *GPU Poor version by **DeepBeepMeep**. This great video generator can now run smoothly on a 12 GB to 24 GB GPU.*
 
 This version has the following improvements over the original Hunyuan Video model:
@@ -45,7 +49,7 @@ You will find the original Hunyuan Video repository here: https://github.com/Ten
  
 
 
-### Installation Guide for Linux and Windows
+## Installation Guide for Linux and Windows
 
 We provide an `environment.yml` file for setting up a Conda environment.
 Conda's installation instructions are available [here](https://docs.anaconda.com/free/miniconda/index.html).
@@ -74,6 +78,7 @@ python -m pip install sageattention==1.0.6
 Note that *Flash attention* and *Sage attention* are quite complex to install on Windows but offers a better memory management (and consequently longer videos) than the default *sdpa attention*.
 Likewise *Pytorch Compilation* will work on Windows only if you manage to install Triton. It is quite a complex process I will try to provide a script in the future.
 
+## Run the application
 ### Profiles
 You can choose between 5 profiles depending on your hardware:
 - HighRAM_HighVRAM  (1): at least 48 GB of RAM and 24 GB of VRAM : the fastest well suited for a RTX 3090 / RTX 4090 but consumes much more VRAM, adapted for fast shorter video
