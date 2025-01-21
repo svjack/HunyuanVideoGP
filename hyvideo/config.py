@@ -31,10 +31,17 @@ def add_network_args(parser: argparse.ArgumentParser):
 
 
     group.add_argument(
+        "--lora-dir",
+        type=str,
+        default="loras",
+        help="Path to a directory that contains Loras"
+    )
+
+    group.add_argument(
         "--lora-weight",
         nargs='+',
         default=[],
-        help="List of Lora Path to Weights"
+        help="List of individual Lora files paths"
     )
 
     group.add_argument(

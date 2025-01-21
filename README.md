@@ -14,7 +14,7 @@
 
   [![Replicate](https://replicate.com/zsxkib/hunyuan-video/badge)](https://replicate.com/zsxkib/hunyuan-video)
 </div>
-
+01/21/2025: Version 3.1 Ability to define a Loras directory and turn on / off any Lora when running the application\
 01/11/2025: Version 3.0 Multiple prompts / multiple generations per prompt, new progression bar, support for pretrained Loras\
 01/06/2025: Version 2.1 Integrated Tea Cache (https://github.com/ali-vilab/TeaCache) for even faster generations\
 01/04/2025: Version 2.0 Full leverage of mmgp 3.0 (faster and even lower RAM requirements ! + support for compilation on Linux and WSL)\
@@ -71,7 +71,7 @@ python -m pip install sageattention==1.0.6
 
 ```
 
-Note that *Flash attention* and *Sage attention* are quite complex to install on Windows but offers a better memory management (and consequently longer videos) than the default *sdap attention*.
+Note that *Flash attention* and *Sage attention* are quite complex to install on Windows but offers a better memory management (and consequently longer videos) than the default *sdpa attention*.
 Likewise *Pytorch Compilation* will work on Windows only if you manage to install Triton. It is quite a complex process I will try to provide a script in the future.
 
 ### Profiles
@@ -102,14 +102,17 @@ Do the following to load a prequantized Lora:
 python3 gradio_server.py --lora-weight lora.safetensors --lora-multiplier 1
 ```
 
+You can also put multiple loras in the subfoler 'loras' and activate / deasactive them when running the application
+
 You can find prebuilt Loras on https://civitai.com/ or build them with tools such kohya or onetrainer.
 
 
 ### Command line parameters for Gradio Server
 --profile no : default (5) : no of profile between 1 and 5\
 --quantize-transformer bool: (default True) : enable / disable on the fly transformer quantization\
---lora-weight path1 path2 ... : list of Loras Path\
---lora-multiplier float mult1 mult2 ... : list of relative weights for each Lora. The corresponding Lora file must be in the diffusers format.\
+--lora-dir path : Path of directory that contains Loras in diffusers / safetensor format\
+--lora-weight path1 path2 ... : list of Loras Path preselected Loras\
+--lora-multiplier float mult1 mult2 ... : list of relative weights for each preselected Lora. The corresponding Lora file must be in the diffusers format.\
 --verbose level : default (1) : level of information between 0 and 2\
 --server-port portno : default (7860) : Gradio port no\
 --server-name name : default (0.0.0.0) : Gradio server name\

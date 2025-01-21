@@ -19,8 +19,10 @@ from mmgp import offload, safetensors2, profile_type
 
 args = parse_args()
 
-lora_weight =args.lora_weight
-lora_multiplier = [float(i) for i in args.lora_multiplier ]
+lora_preselected =args.lora_weight
+lora_dir =args.lora_dir
+
+lora_preseleted_multiplier = [float(i) for i in args.lora_multiplier ]
 force_profile_no = int(args.profile)
 verbose_level = int(args.verbose)
 quantizeTransformer = args.quantize_transformer
@@ -113,10 +115,32 @@ pipe = hunyuan_video_sampler.pipeline
 
 #compile = "transformer"
 
-# lora_weight =["ckpts/arny_lora.safetensors"]
+# lora_weight =["ckpts/arny_lora.safetensors"] # 'ohwx person' ,; 'wick'
 # lora_multi = [1.0]
-if len(lora_weight) > 0:
-    offload.load_loras_into_model(pipe.transformer, lora_weight, lora_multiplier)
+loras =[]
+loras_names = []
+default_loras_choices = []
+default_loras_multis_str = ""
+
+if len(lora_preselected) > 0:
+    loras += lora_preselected
+    loras_multis = (lora_preseleted_multiplier + ([1.0] * len(loras)) ) [:len(loras)]
+    default_loras_choices = [ str(i) for i in range(len(loras))]
+    default_loras_multis_str = "_".join([str(el) for el in loras_multis])
+
+if lora_dir != None:
+    if not os.path.isdir(lora_dir):
+        raise Exception("--lora-dir should be a path to a directory that contains Loras")
+    
+    import glob
+    dir_loras =  glob.glob( os.path.join(lora_dir , "*.sft") ) + glob.glob( os.path.join(lora_dir , "*.safetensors") ) 
+    dir_loras.sort()
+    loras += [element for element in dir_loras if element not in loras ]
+
+if len(loras) > 0:
+    loras_names = [ Path(lora).stem for lora in loras  ]
+    offload.load_loras_into_model(pipe.transformer, loras,  activate_all_loras=False) #lora_multiplier,
+
 offload.profile(pipe, profile_no= profile, compile = compile, quantizeTransformer = quantizeTransformer) 
 def apply_changes(
                     transformer_choice,
@@ -198,10 +222,35 @@ def generate_video(
     embedded_guidance_scale,
     repeat_generation,
     tea_cache,
+    loras_choices,
+    loras_mult_choices,
     state,
     progress=gr.Progress() #track_tqdm= True
 
 ):
+    
+
+    if len(loras) > 0:
+        def is_float(element: any) -> bool:
+            if element is None: 
+                return False
+            try:
+                float(element)
+                return True
+            except ValueError:
+                return False
+        list_mult_choices_str = loras_mult_choices.split(" ")
+        list_mult_choices_nums = []
+        for i, mult in enumerate(list_mult_choices_str):
+            mult = mult.strip()
+            if not is_float(mult):                
+                raise gr.Error("Lora Multiplier no {i+1} ({mult}) is invalid")
+            list_mult_choices_nums.append(float(mult))
+        if len(list_mult_choices_nums ) <len(loras_choices):
+            list_mult_choices_nums  += [1.0] * ( len(loras_choices) - len(list_mult_choices_nums ) )
+
+        offload.activate_loras(pipe.transformer, loras_choices, list_mult_choices_nums)
+
     seed = None if seed == -1 else seed
     width, height = resolution.split("x")
     width, height = int(width), int(height)
@@ -422,6 +471,19 @@ def create_demo(model_path, save_path):
                     #     value=97,
                     # )
                 num_inference_steps = gr.Slider(1, 100, value=50, step=1, label="Number of Inference Steps")
+    
+
+                loras_choices = gr.Dropdown(
+                    choices=[
+                        (lora_name, str(i) ) for i, lora_name in enumerate(loras_names)
+                    ],
+                    value= default_loras_choices,
+                    multiselect= True,
+                    visible= len(loras)>0,
+                    label="Activated Loras"
+                )
+                loras_mult_choices = gr.Textbox(label="Loras Multipliers (1.0 by default) separated by space characters", value=default_loras_multis_str, visible= len(loras)>0 )
+
                 show_advanced = gr.Checkbox(label="Show Advanced Options", value=False)
                 with gr.Row(visible=False) as advanced_row:
                     with gr.Column():
@@ -469,6 +531,8 @@ def create_demo(model_path, save_path):
                 embedded_guidance_scale,
                 repeat_generation,
                 tea_cache_setting,
+                loras_choices,
+                loras_mult_choices,
                 state
             ],
             outputs= [gen_status] #,state 
