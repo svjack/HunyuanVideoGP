@@ -23,4 +23,4 @@ else
 fi
 
 # Start the server
-python radio_server.py --profile ${HUNYUAN_PROFILE}
+python gradio_server.py --profile ${HUNYUAN_PROFILE}
