@@ -239,14 +239,15 @@ def generate_video(
                 return True
             except ValueError:
                 return False
-        list_mult_choices_str = loras_mult_choices.split(" ")
-        list_mult_choices_nums = []
-        for i, mult in enumerate(list_mult_choices_str):
-            mult = mult.strip()
-            if not is_float(mult):                
-                raise gr.Error("Lora Multiplier no {i+1} ({mult}) is invalid")
-            list_mult_choices_nums.append(float(mult))
-        if len(list_mult_choices_nums ) <len(loras_choices):
+        if len(loras_mult_choices) > 0:
+            list_mult_choices_str = loras_mult_choices.split(" ")
+            list_mult_choices_nums = []
+            for i, mult in enumerate(list_mult_choices_str):
+                mult = mult.strip()
+                if not is_float(mult):                
+                    raise gr.Error(f"Lora Multiplier no {i+1} ({mult}) is invalid")
+                list_mult_choices_nums.append(float(mult))
+        if len(list_mult_choices_nums ) < len(loras_choices):
             list_mult_choices_nums  += [1.0] * ( len(loras_choices) - len(list_mult_choices_nums ) )
 
         offload.activate_loras(pipe.transformer, loras_choices, list_mult_choices_nums)
