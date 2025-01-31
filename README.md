@@ -124,15 +124,20 @@ You can find prebuilt Loras on https://civitai.com/ or build them with tools suc
 --open-browser : open automatically Browser when launching Gradio Server\
 
 ### Other Models for the GPU Poor
-- HuanyuanVideoGP: https://github.com/deepbeepmeep/HunyuanVideoGP
-One of the best open source Text to Video generator
+- Hunyuan3D-2GP: https://github.com/deepbeepmeep/Hunyuan3D-2GP :\
+A great image to 3D and text to 3D tool by the Tencent team. Thanks to mmgp it can run with less than 6 GB of VRAM
 
-- FluxFillGP: https://github.com/deepbeepmeep/FluxFillGP
+- FluxFillGP: https://github.com/deepbeepmeep/FluxFillGP :\
 One of the best inpainting / outpainting tools based on Flux that can run with less than 12 GB of VRAM.
 
-- Cosmos1GP: https://github.com/deepbeepmeep/Cosmos1GP
+- Cosmos1GP: https://github.com/deepbeepmeep/Cosmos1GP :\
 This application include two models: a text to world generator and a image / video to world (probably the best open source image to video generator).
 
+- OminiControlGP: https://github.com/deepbeepmeep/OminiControlGP :\
+A Flux derived application very powerful that can be used to transfer an object of your choice in a prompted scene. With mmgp you can run it with only 6 GB of VRAM.
+
+- YuE GP: https://github.com/deepbeepmeep/YuEGP :\
+A great song generator (instruments + singer's voice) based on prompted Lyrics and a genre description. Thanks to mmgp you can run it with less than 10 GB of VRAM without waiting forever.
 
 
 
