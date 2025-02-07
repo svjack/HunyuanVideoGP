@@ -15,6 +15,11 @@ except ImportError:
     _flash_attn_forward = None
 
 try:
+    from xformers.ops import memory_efficient_attention
+except ImportError:
+    memory_efficient_attention = None
+
+try:
     from sageattention import sageattn_varlen
     def sageattn_varlen_wrapper(
             q,
@@ -33,6 +38,10 @@ MEMORY_LAYOUT = {
     "sdpa": (
         lambda x: x.transpose(1, 2),
         lambda x: x.transpose(1, 2),
+    ),
+    "xformers": (
+        lambda x: x,
+        lambda x: x,
     ),
     "sage": (
         lambda x: x.view(x.shape[0] * x.shape[1], *x.shape[2:]),
@@ -116,6 +125,13 @@ def attention(
         torch.Tensor: Output tensor after self attention with shape [b, s, ad]
     """
     pre_attn_layout, post_attn_layout = MEMORY_LAYOUT[mode]
+    padding_length = 0
+    if attn_mask == None and mode == "sdpa": 
+        padding_length  = q.shape[1] - cu_seqlens_q
+        q = q[:, :cu_seqlens_q, ... ]
+        k = k[:, :cu_seqlens_kv, ... ]
+        v = v[:, :cu_seqlens_kv, ... ]
+
     q = pre_attn_layout(q)
     k = pre_attn_layout(k)
     v = pre_attn_layout(v)
@@ -129,9 +145,13 @@ def attention(
         
     elif mode == "sdpa":
         if attn_mask is not None and attn_mask.dtype != torch.bool:
-            attn_mask = attn_mask.to(q.dtype)
+            attn_mask = attn_mask.to(q.dtype)            
         x = F.scaled_dot_product_attention(
             q, k, v, attn_mask=attn_mask, dropout_p=drop_rate, is_causal=causal
+        )
+    elif mode == "xformers":
+        x = memory_efficient_attention(
+            q, k, v , attn_bias= attn_mask
         )
 
     elif mode == "sage":
@@ -198,6 +218,9 @@ def attention(
     x = post_attn_layout(x)
     b, s, a, d = x.shape
     out = x.reshape(b, s, -1)
+    if padding_length > 0 :
+        out = torch.cat([out, torch.empty( (out.shape[0], padding_length, out.shape[2]), dtype= out.dtype, device=out.device  ) ], 1)
+
     return out
 
 

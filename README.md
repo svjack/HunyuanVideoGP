@@ -17,6 +17,7 @@
 
 
 ## News
+* 02/07/2025: Version 3.2 Added support for Xformers attention and reduce VRAM requirements for sdpa attention
 * 01/21/2025: Version 3.1 Ability to define a Loras directory and turn on / off any Lora when running the application
 * 01/11/2025: Version 3.0 Multiple prompts / multiple generations per prompt, new progression bar, support for pretrained Loras
 * 01/06/2025: Version 2.1 Integrated Tea Cache (https://github.com/ali-vilab/TeaCache) for even faster generations
@@ -72,6 +73,9 @@ python -m pip install flash-attn==2.7.2.post1
 
 # 4.2 optional Sage attention support (30% faster, easy to install on Linux but much harder on Windows)
 python -m pip install sageattention==1.0.6 
+
+# 4.3 optional Xformers attention support (same speed as sdpa attention but lower VRAM requirements, easy to install on Linux but much harder on Windows)
+python -m pip install xformers
 
 ```
 

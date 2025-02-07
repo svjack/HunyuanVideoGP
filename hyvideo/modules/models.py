@@ -18,6 +18,11 @@ from .modulate_layers import ModulateDiT, modulate, apply_gate
 from .token_refiner import SingleTokenRefiner
 import numpy as np
 
+try:
+    from xformers.ops.fmha.attn_bias import BlockDiagonalPaddedKeysMask
+except ImportError:
+    BlockDiagonalPaddedKeysMask = None
+
 class MMDoubleStreamBlock(nn.Module):
     """
     A multimodal dit block with seperate modulation for
@@ -688,18 +693,32 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
         max_seqlen_q = img_seq_len + txt_seq_len
         max_seqlen_kv = max_seqlen_q
 
-        # thanks to kijai (https://github.com/kijai/ComfyUI-HunyuanVideoWrapper/), for the code to support sdpa
+        any_compilation = getattr(self, "any_compilation", False)
         if self.attention_mode == "sdpa":
-            cu_seqlens_q, cu_seqlens_kv = None, None
-            # Create a square boolean mask filled with False
-            attn_mask = torch.zeros((1, max_seqlen_q, max_seqlen_q), dtype=torch.bool, device=text_mask.device)
+            if x.shape[0] == 1 and not any_compilation: # if compilation is set, the trick used to make sdpa work will invalidate the compilation cache if one changes the prompt (due to changing tensor shapes)            
+                # newly improved masking code that doesn't require a cumbersome mask....
+                text_len = text_mask[0].sum().item()
+                total_len = text_len + img_seq_len
+                cu_seqlens_q = cu_seqlens_kv = total_len
+                attn_mask = None
+            else:
+                cu_seqlens_q, cu_seqlens_kv = None, None
+                # thanks to kijai (https://github.com/kijai/ComfyUI-HunyuanVideoWrapper/), for the original code to support sdpa
+                # Create a square boolean mask filled with False
+                attn_mask = torch.zeros((1, max_seqlen_q, max_seqlen_q), dtype=torch.bool, device=text_mask.device)
 
-            # Calculate the valid attention regions
+                # Calculate the valid attention regions
+                text_len = text_mask[0].sum().item()
+                total_len = text_len + img_seq_len
+
+                # Allow attention to 6all tokens up to total_len
+                attn_mask[0, :total_len, :total_len] = True
+        elif self.attention_mode == "xformers":
             text_len = text_mask[0].sum().item()
             total_len = text_len + img_seq_len
+            cu_seqlens_q, cu_seqlens_kv = None, None
+            attn_mask = BlockDiagonalPaddedKeysMask.from_seqlens([total_len, max_seqlen_q- total_len ],max_seqlen_kv, [total_len, 0] ) 
 
-            # Allow attention to all tokens up to total_len
-            attn_mask[0, :total_len, :total_len] = True
         else:
             attn_mask = None
             # Compute cu_squlens for flash and sage attention

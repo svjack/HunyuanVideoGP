@@ -31,6 +31,28 @@ def add_network_args(parser: argparse.ArgumentParser):
 
 
     group.add_argument(
+        "--lora-dir-i2v",
+        type=str,
+        default="loras_i2v",
+        help="Path to a directory that contains Loras for i2v"
+    )
+
+    group.add_argument(
+        "--lora-weight-i2v",
+        nargs='+',
+        default=[],
+        help="List of individual Lora files paths for i2v"
+    )
+
+    group.add_argument(
+        "--lora-multiplier-i2v",
+        nargs='+',
+        default=[],
+        help="List of Lora multipliers for i2v"
+    )
+
+
+    group.add_argument(
         "--lora-dir",
         type=str,
         default="loras",
@@ -83,6 +105,18 @@ def add_network_args(parser: argparse.ArgumentParser):
         "--open-browser",
         action="store_true",
         help="open browser"
+    )
+
+    group.add_argument(
+        "--t2v",
+        action="store_true",
+        help="text to video mode"
+    )
+
+    group.add_argument(
+        "--i2v",
+        action="store_true",
+        help="image to video mode"
     )
 
     # Main model

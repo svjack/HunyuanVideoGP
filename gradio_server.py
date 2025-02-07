@@ -18,24 +18,28 @@ from mmgp import offload, safetensors2, profile_type
 
 
 args = parse_args()
+args.flow_reverse = True
 
-lora_preselected =args.lora_weight
-lora_dir =args.lora_dir
 
-lora_preseleted_multiplier = [float(i) for i in args.lora_multiplier ]
+
+
 force_profile_no = int(args.profile)
 verbose_level = int(args.verbose)
 quantizeTransformer = args.quantize_transformer
 
-transformer_choices=["ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_bf16.safetensors", "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_quanto_int8.safetensors", "ckpts/hunyuan-video-t2v-720p/transformers/fast_hunyuan_video_720_quanto_int8.safetensors"]
+transformer_choices_t2v=["ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_bf16.safetensors", "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_quanto_int8.safetensors", "ckpts/hunyuan-video-t2v-720p/transformers/fast_hunyuan_video_720_quanto_int8.safetensors"]
+transformer_choices_i2v=["ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_bf16.safetensors", "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_quanto_int8.safetensors", "ckpts/hunyuan-video-t2v-720p/transformers/fast_hunyuan_video_720_quanto_int8.safetensors"]
 text_encoder_choices = ["ckpts/text_encoder/llava-llama-3-8b-v1_1_fp16.safetensors", "ckpts/text_encoder/llava-llama-3-8b-v1_1_quanto_int8.safetensors"]
+
 server_config_filename = "gradio_config.json"
 
 if not Path(server_config_filename).is_file():
     server_config = {"attention_mode" : "sdpa",  
-                     "transformer_filename": transformer_choices[1], 
+                     "transformer_filename": transformer_choices_t2v[1], 
+                     "transformer_filename_i2v": transformer_choices_i2v[1],  ########
                      "text_encoder_filename" : text_encoder_choices[1],
                      "compile" : "",
+                     "default_ui": "t2v",
                      "profile" : profile_type.LowRAM_LowVRAM }
 
     with open(server_config_filename, "w", encoding="utf-8") as writer:
@@ -45,11 +49,29 @@ else:
         text = reader.read()
     server_config = json.loads(text)
 
-transformer_filename = server_config["transformer_filename"]
+
+transformer_filename_t2v = server_config["transformer_filename"]
+transformer_filename_i2v = server_config.get("transformer_filename_i2v", transformer_choices_i2v[1]) ########
 text_encoder_filename = server_config["text_encoder_filename"]
 attention_mode = server_config["attention_mode"]
 profile =  force_profile_no if force_profile_no >=0 else server_config["profile"]
 compile = server_config.get("compile", "")
+default_ui = server_config.get("default_ui", "t2v") 
+use_image2video = default_ui != "t2v"
+if args.t2v:
+    use_image2video = False
+if args.i2v:
+    use_image2video = True
+
+if use_image2video:
+    lora_preselected =args.lora_weight_i2v
+    lora_dir =args.lora_dir_i2v
+    lora_preseleted_multiplier = [float(i) for i in args.lora_multiplier_i2v ]
+else:
+    lora_preselected =args.lora_weight
+    lora_dir =args.lora_dir
+    lora_preseleted_multiplier  = [float(i) for i in args.lora_multiplier ]
+
 
 #transformer_filename = "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_bf16.safetensors"
 #transformer_filename = "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_quanto_int8.safetensors"
@@ -58,9 +80,11 @@ compile = server_config.get("compile", "")
 #text_encoder_filename = "ckpts/text_encoder/llava-llama-3-8b-v1_1_fp16.safetensors"
 #text_encoder_filename = "ckpts/text_encoder/llava-llama-3-8b-v1_1_quanto_int8.safetensors"
 
-#attention_mode="sage"
+attention_mode="sage"
 #attention_mode="flash"
-#attention_mode = "sdpa"
+#attention_mode="sdpa"
+#attention_mode="xformers"
+#compile = "transformer"
 
 def download_models(transformer_filename, text_encoder_filename):
     def computeList(filename):
@@ -85,9 +109,7 @@ def download_models(transformer_filename, text_encoder_filename):
                 if not os.path.isfile(targetRoot + sourceFolder + "/" + onefile ):          
                     hf_hub_download(repo_id=repoId,  filename=onefile, local_dir = targetRoot, subfolder=sourceFolder)
 
-
-download_models(transformer_filename, text_encoder_filename) 
-
+download_models(transformer_filename_i2v if use_image2video else transformer_filename_t2v, text_encoder_filename) 
 
 offload.default_verboseLevel = verbose_level
 with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "r", encoding="utf-8") as reader:
@@ -99,64 +121,86 @@ if vae_config["sample_tsize"] == 64:
 with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "w", encoding="utf-8") as writer:
     writer.write(json.dumps(vae_config))
 
-args.flow_reverse = True
-if profile == 5:
-    pinToMemory = False
-    partialPinning = False
-else:    
-    pinToMemory =  True
-    import psutil
-    physical_memory= psutil.virtual_memory().total    
-    partialPinning = physical_memory <= 2**30 * 32 
 
 
-hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(transformer_filename, text_encoder_filename, attention_mode = attention_mode, pinToMemory = pinToMemory, partialPinning = partialPinning, args=args,  device="cpu") 
-pipe = hunyuan_video_sampler.pipeline
+def setup_loras(pipe, lora_preselected, lora_dir, lora_preseleted_multiplier):
+    # lora_weight =["ckpts/arny_lora.safetensors"] # 'ohwx person' ,; 'wick'
+    # lora_multi = [1.0]
+    loras =[]
+    loras_names = []
+    default_loras_choices = []
+    default_loras_multis_str = ""
 
-#compile = "transformer"
 
-# lora_weight =["ckpts/arny_lora.safetensors"] # 'ohwx person' ,; 'wick'
-# lora_multi = [1.0]
-loras =[]
-loras_names = []
-default_loras_choices = []
-default_loras_multis_str = ""
+    if len(lora_preselected) > 0:
+        loras += lora_preselected
+        loras_multis = (lora_preseleted_multiplier + ([1.0] * len(loras)) ) [:len(loras)]
+        default_loras_choices = [ str(i) for i in range(len(loras))]
+        default_loras_multis_str = "_".join([str(el) for el in loras_multis])
 
-if len(lora_preselected) > 0:
-    loras += lora_preselected
-    loras_multis = (lora_preseleted_multiplier + ([1.0] * len(loras)) ) [:len(loras)]
-    default_loras_choices = [ str(i) for i in range(len(loras))]
-    default_loras_multis_str = "_".join([str(el) for el in loras_multis])
 
-if lora_dir != None:
-    if not os.path.isdir(lora_dir):
-        raise Exception("--lora-dir should be a path to a directory that contains Loras")
-    
-    import glob
-    dir_loras =  glob.glob( os.path.join(lora_dir , "*.sft") ) + glob.glob( os.path.join(lora_dir , "*.safetensors") ) 
-    dir_loras.sort()
-    loras += [element for element in dir_loras if element not in loras ]
+    if lora_dir != None:
+        if not os.path.isdir(lora_dir):
+            raise Exception("--lora-dir should be a path to a directory that contains Loras")
+        
+        import glob
+        dir_loras =  glob.glob( os.path.join(lora_dir , "*.sft") ) + glob.glob( os.path.join(lora_dir , "*.safetensors") ) 
+        dir_loras.sort()
+        loras += [element for element in dir_loras if element not in loras ]
 
-if len(loras) > 0:
-    loras_names = [ Path(lora).stem for lora in loras  ]
-    offload.load_loras_into_model(pipe.transformer, loras,  activate_all_loras=False) #lora_multiplier,
+    if len(loras) > 0:
+        loras_names = [ Path(lora).stem for lora in loras  ]
+        offload.load_loras_into_model(pipe.transformer, loras,  activate_all_loras=False) #lora_multiplier,
+    return loras, loras_names, default_loras_choices, default_loras_multis_str
 
-offload.profile(pipe, profile_no= profile, compile = compile, quantizeTransformer = quantizeTransformer) 
+
+def load_models(i2v,lora_preselected, lora_dir, lora_preseleted_multiplier ):
+    if profile == 5:
+        pinToMemory = False
+        partialPinning = False
+    else:    
+        pinToMemory =  True
+        import psutil
+        physical_memory= psutil.virtual_memory().total    
+        partialPinning = physical_memory <= 2**30 * 32 
+
+    hunyuan_video_sampler = HunyuanVideoSampler.from_pretrained(transformer_filename_i2v if i2v else transformer_filename_t2v, text_encoder_filename, attention_mode = attention_mode, pinToMemory = pinToMemory, partialPinning = partialPinning, args=args,  device="cpu") 
+    pipe = hunyuan_video_sampler.pipeline
+    pipe.transformer.any_compilation = len(compile)>0
+
+
+    loras, loras_names, default_loras_choices, default_loras_multis_str = setup_loras(pipe, lora_preselected, lora_dir, lora_preseleted_multiplier)
+    offloadobj = offload.profile(pipe, profile_no= profile, compile = compile, quantizeTransformer = quantizeTransformer)  
+
+
+    return hunyuan_video_sampler, loras, loras_names, default_loras_choices, default_loras_multis_str
+
+hunyuan_video_sampler,  loras, loras_names, default_loras_choices, default_loras_multis_str = load_models(use_image2video,lora_preselected, lora_dir, lora_preseleted_multiplier )
+
 def apply_changes(
-                    transformer_choice,
+                    transformer_t2v_choice,
+                    transformer_i2v_choice,
                     text_encoder_choice,
                     attention_choice,
                     compile_choice,
                     profile_choice,
+                    default_ui_choice ="t2v",
 ):
+    global offloadobj, hunyuan_video_sampler
     server_config = {"attention_mode" : attention_choice,  
-                     "transformer_filename": transformer_choices[transformer_choice], 
+                     "transformer_filename": transformer_choices_t2v[transformer_t2v_choice], 
+                     "transformer_filename_i2v": transformer_choices_i2v[transformer_i2v_choice],  ##########
                      "text_encoder_filename" : text_encoder_choices[text_encoder_choice],
                      "compile" : compile_choice,
-                     "profile" : profile_choice }
-
+                     "profile" : profile_choice,
+                     "default_ui" : default_ui_choice,
+                       }
     with open(server_config_filename, "w", encoding="utf-8") as writer:
         writer.write(json.dumps(server_config))
+
+    # hunyuan_video_sampler = None
+    # offload.release(offloadobj)
+    # hunyuan_video_sampler,  loras, loras_names, default_loras_choices, default_loras_multis_str = load_models(use_image2video,lora_preselected, lora_dir, lora_preseleted_multiplier )
 
     return "<h1>New Config file created. Please restart the Gradio Server</h1>"
 
@@ -193,7 +237,7 @@ def abort_generation(state):
         return gr.Button(interactive=  True)
 
 def refresh_gallery(state):
-    file_list = state["file_list"]      
+    file_list = state.get("file_list", None)      
     return file_list
         
 def finalize_gallery(state):
@@ -224,11 +268,39 @@ def generate_video(
     tea_cache,
     loras_choices,
     loras_mult_choices,
+    image_to_continue,
+    video_to_continue,
+    max_frames,
     state,
     progress=gr.Progress() #track_tqdm= True
 
 ):
     
+    from PIL import Image
+    import numpy as np
+    import tempfile
+    temp_filename = None
+    if use_image2video:
+        if image_to_continue is not None:
+            PIL_image = Image.fromarray(np.uint8(image_to_continue)).convert('RGB')
+            with tempfile.NamedTemporaryFile("w+b", delete = False, suffix=".png") as fp: 
+                PIL_image.save(fp, format="png")
+                fp.close()
+
+            input_image_or_video_path = fp.name
+            temp_filename = input_image_or_video_path
+            # pipeline.num_input_frames = 1 
+            # pipeline.max_frames = 1 
+
+        elif video_to_continue != None and len(video_to_continue) >0 :
+            input_image_or_video_path = video_to_continue
+            # pipeline.num_input_frames = max_frames
+            # pipeline.max_frames = max_frames
+        else:
+            return
+    else:
+        input_image_or_video_path = None
+
 
     if len(loras) > 0:
         def is_float(element: any) -> bool:
@@ -239,9 +311,9 @@ def generate_video(
                 return True
             except ValueError:
                 return False
+        list_mult_choices_nums = []
         if len(loras_mult_choices) > 0:
             list_mult_choices_str = loras_mult_choices.split(" ")
-            list_mult_choices_nums = []
             for i, mult in enumerate(list_mult_choices_str):
                 mult = mult.strip()
                 if not is_float(mult):                
@@ -250,7 +322,7 @@ def generate_video(
         if len(list_mult_choices_nums ) < len(loras_choices):
             list_mult_choices_nums  += [1.0] * ( len(loras_choices) - len(list_mult_choices_nums ) )
 
-        offload.activate_loras(pipe.transformer, loras_choices, list_mult_choices_nums)
+        offload.activate_loras(hunyuan_video_sampler.pipeline.transformer, loras_choices, list_mult_choices_nums)
 
     seed = None if seed == -1 else seed
     width, height = resolution.split("x")
@@ -296,23 +368,29 @@ def generate_video(
             progress(0, desc=status + " - Encoding Prompt" )   
             
             callback = build_callback(state, hunyuan_video_sampler.pipeline, progress, status, num_inference_steps)
-            outputs = hunyuan_video_sampler.predict(
-                prompt=prompt,
-                height=height,
-                width=width, 
-                video_length=(video_length // 4)* 4 + 1 ,
-                seed=seed,
-                negative_prompt=negative_prompt,
-                infer_steps=num_inference_steps,
-                guidance_scale=guidance_scale,
-                num_videos_per_prompt=1,
-                flow_shift=flow_shift,
-                batch_size=1,
-                embedded_guidance_scale=embedded_guidance_scale,
-                callback = callback,
-                callback_steps = 1,
 
-            )
+            if use_image2video:
+                # input_image_or_video_path
+                raise Exception("image 2 video not yet supported") #################
+            else:
+
+                outputs = hunyuan_video_sampler.predict(
+                    prompt=prompt,
+                    height=height,
+                    width=width, 
+                    video_length=(video_length // 4)* 4 + 1 ,
+                    seed=seed,
+                    negative_prompt=negative_prompt,
+                    infer_steps=num_inference_steps,
+                    guidance_scale=guidance_scale,
+                    num_videos_per_prompt=1,
+                    flow_shift=flow_shift,
+                    batch_size=1,
+                    embedded_guidance_scale=embedded_guidance_scale,
+                    callback = callback,
+                    callback_steps = 1,
+
+                )
 
             samples = outputs['samples']
             
@@ -349,16 +427,26 @@ def generate_video(
                         yield f"Total Generation Time: {end_time-start_time:.1f}s"
             seed += 1
 
+    if temp_filename!= None and  os.path.isfile(temp_filename):
+        os.remove(temp_filename)
+
 
 
 def create_demo(model_path, save_path):
     
     with gr.Blocks() as demo:
-        gr.Markdown("<div align=center><H1>HunyuanVideo<SUP>GP</SUP></H3></div>")
-        gr.Markdown("*Original model by Tencent, GPU Poor version by DeepBeepMeep. Now this great video generator can run smoothly on a 24 GB rig.*")
-        gr.Markdown("Please be aware of these limits with profiles 2 and 4 if you have 24 GB of VRAM (RTX 3090 / RTX 4090):")
-        gr.Markdown("- max 192 frames for 848 x 480 ")
-        gr.Markdown("- max 86 frames for 1280 x 720")
+        if use_image2video:
+            gr.Markdown("<div align=center><H1>HunyuanVideo<SUP>GP</SUP> - AI Image To Video Generator</H3></div>")
+        else:
+            gr.Markdown("<div align=center><H1>HunyuanVideo<SUP>GP</SUP> - AI Text To Video Generator</H3></div>")
+
+        gr.Markdown("*Original model by Tencent, GPU Poor version by DeepBeepMeep. Generate great videos with 12 GB of VRAM or more.*")
+        if use_image2video:
+            pass
+        else:
+            gr.Markdown("Please be aware of these limits with profiles 2 and 4 if you have 24 GB of VRAM (RTX 3090 / RTX 4090):")
+            gr.Markdown("- max 192 frames for 848 x 480 ")
+            gr.Markdown("- max 86 frames for 1280 x 720")
         gr.Markdown("In the worst case, one step should not take more than 2 minutes. If it is the case you may be running out of RAM / VRAM. Try to generate fewer images / lower res / a less demanding profile.")
         gr.Markdown("If you have a Linux / WSL system you may turn on compilation (see below) and will be able to generate an extra 30°% frames")
 
@@ -366,18 +454,31 @@ def create_demo(model_path, save_path):
             gr.Markdown("For the changes to be effective you will need to restart the gradio_server")
 
             with gr.Column():
-                index = transformer_choices.index(transformer_filename)
+                index = transformer_choices_t2v.index(transformer_filename_t2v)
                 index = 0 if index ==0 else index
-
-                transformer_choice = gr.Dropdown(
+                transformer_t2v_choice = gr.Dropdown(
                     choices=[
-                        ("Hunyuan Video 16 bits - the default engine in its original glory, offers a slightly better image quality but slower and requires more RAM", 0),
-                        ("Hunyuan Video quantized to 8 bits (recommended) - the default engine but quantized", 1),
-                        ("Fast Hunyuan Video quantized to 8 bits - requires less than 10 steps but worse quality", 2), 
+                        ("Hunyuan Text to Video 16 bits - the default engine in its original glory, offers a slightly better image quality but slower and requires more RAM", 0),
+                        ("Hunyuan Text to Video quantized to 8 bits (recommended) - the default engine but quantized", 1),
+                        ("Fast Hunyuan Text to Video quantized to 8 bits - requires less than 10 steps but worse quality", 2), 
                     ],
                     value= index,
-                    label="Transformer"
+                    label="Transformer model for Text to Video"
                  )
+
+                index = transformer_choices_i2v.index(transformer_filename_i2v)
+                index = 0 if index ==0 else index
+                transformer_i2v_choice = gr.Dropdown(
+                    choices=[
+                        ("Hunyuan Image to Video 16 bits - the default engine in its original glory, offers a slightly better image quality but slower and requires more RAM", 0),
+                        ("Hunyuan Image to Video quantized to 8 bits (recommended) - the default engine but quantized", 1),
+                        # ("Fast Hunyuan Video quantized to 8 bits - requires less than 10 steps but worse quality", 2), 
+                    ],
+                    value= index,
+                    label="Transformer model for Image to Video",
+                    visible = True, ###############
+                 )
+
                 index = text_encoder_choices.index(text_encoder_filename)
                 index = 0 if index ==0 else index
 
@@ -388,12 +489,13 @@ def create_demo(model_path, save_path):
                         ("Llava Llama 1.1 quantized to 8 bits - quantized text encoder, worse quality but uses less RAM", 1),
                     ],
                     value= index,
-                    label="Text Encoder"
+                    label="Text Encoder model"
                  )
                 attention_choice = gr.Dropdown(
                     choices=[
                         ("Scale Dot Product Attention: default", "sdpa"),
                         ("Flash: good quality - requires additional install (usually complex to set up on Windows without WSL)", "flash"),
+                        ("Xformers: good quality - requires additional install (usually complex, may consume less VRAM to set up on Windows without WSL)", "xformers"),
                         ("Sage: 30% faster but worse quality - requires additional install (usually complex to set up on Windows without WSL)", "sage"),
                     ],
                     value= attention_mode,
@@ -420,23 +522,37 @@ def create_demo(model_path, save_path):
                     label="Profile"
                  )
 
+                default_ui_choice = gr.Dropdown(
+                    choices=[
+                        ("Text to Video", "t2v"),
+                        ("Image to Video", "i2v"),
+                    ],
+                    value= default_ui,
+                    label="Default mode when launching the App if not '--t2v' ot '--i2v' switch is specified when launching the server "
+                 )                
+
                 msg = gr.Markdown()            
                 apply_btn  = gr.Button("Apply Changes")
 
                 apply_btn.click(
                         fn=apply_changes,
                         inputs=[
-                            transformer_choice,
+                            transformer_t2v_choice,
+                            transformer_i2v_choice,
                             text_encoder_choice,
                             attention_choice,
                             compile_choice,                            
                             profile_choice,
+                            default_ui_choice,
                         ],
                         outputs= msg
                     )
 
         with gr.Row():
             with gr.Column():
+                video_to_continue = gr.Video(label= "Video to continue", visible= use_image2video and False) #######  
+                image_to_continue = gr.Image(label= "Image as a starting point for a new video", visible=use_image2video)
+
                 prompt = gr.Textbox(label="Prompt", value="A large orange octopus is seen resting on the bottom of the ocean floor, blending in with the sandy and rocky terrain. Its tentacles are spread out around its body, and its eyes are closed. The octopus is unaware of a king crab that is crawling towards it from behind a rock, its claws raised and ready to attack. The crab is brown and spiny, with long legs and antennae. The scene is captured from a wide angle, showing the vastness and depth of the ocean. The water is clear and blue, with rays of sunlight filtering through. The shot is sharp and crisp, with a high dynamic range. The octopus and the crab are in focus, while the background is slightly blurred, creating a depth of field effect.")
                 with gr.Row():
                     resolution = gr.Dropdown(
@@ -472,6 +588,8 @@ def create_demo(model_path, save_path):
                     #     value=97,
                     # )
                 num_inference_steps = gr.Slider(1, 100, value=50, step=1, label="Number of Inference Steps")
+                seed = gr.Number(value=42, label="Seed (-1 for random)")
+                max_frames = gr.Slider(1, 100, value=9, step=1, label="Number of input frames to use for Video2World prediction", visible=use_image2video and False) #########
     
 
                 loras_choices = gr.Dropdown(
@@ -488,7 +606,6 @@ def create_demo(model_path, save_path):
                 show_advanced = gr.Checkbox(label="Show Advanced Options", value=False)
                 with gr.Row(visible=False) as advanced_row:
                     with gr.Column():
-                        seed = gr.Number(value=-1, label="Seed (-1 for random)")
                         guidance_scale = gr.Slider(1.0, 20.0, value=1.0, step=0.5, label="Guidance Scale")
                         flow_shift = gr.Slider(0.0, 25.0, value=7.0, step=0.1, label="Flow Shift") 
                         embedded_guidance_scale = gr.Slider(1.0, 20.0, value=6.0, step=0.5, label="Embedded Guidance Scale")
@@ -534,6 +651,9 @@ def create_demo(model_path, save_path):
                 tea_cache_setting,
                 loras_choices,
                 loras_mult_choices,
+                image_to_continue,
+                video_to_continue,
+                max_frames,
                 state
             ],
             outputs= [gen_status] #,state 
