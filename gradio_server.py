@@ -80,7 +80,7 @@ else:
 #text_encoder_filename = "ckpts/text_encoder/llava-llama-3-8b-v1_1_fp16.safetensors"
 #text_encoder_filename = "ckpts/text_encoder/llava-llama-3-8b-v1_1_quanto_int8.safetensors"
 
-attention_mode="sage"
+#attention_mode="sage"
 #attention_mode="flash"
 #attention_mode="sdpa"
 #attention_mode="xformers"
