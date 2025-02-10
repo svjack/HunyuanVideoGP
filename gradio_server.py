@@ -53,7 +53,6 @@ else:
 transformer_filename_t2v = server_config["transformer_filename"]
 transformer_filename_i2v = server_config.get("transformer_filename_i2v", transformer_choices_i2v[1]) ########
 
-fast_hunyan = "fast" in transformer_filename_t2v
 text_encoder_filename = server_config["text_encoder_filename"]
 attention_mode = server_config["attention_mode"]
 profile =  force_profile_no if force_profile_no >=0 else server_config["profile"]
@@ -83,6 +82,8 @@ if args.fastest:
     compile="transformer"
     attention_mode="sage"
     default_tea_cache = 0.15
+
+fast_hunyan = "fast" in transformer_filename_t2v
 
 #transformer_filename = "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_bf16.safetensors"
 #transformer_filename = "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_quanto_int8.safetensors"

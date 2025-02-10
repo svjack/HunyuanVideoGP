@@ -128,12 +128,13 @@ python3 gradio_server.py --fast
 ```bash
 python3 gradio_server.py --fastest
 ```
-For this switch to work you will need to install Triton and Sage attention.\
-Please note that the first sampling step of the first video generation will talke two minutes to perform the compilation.\
-Consecutive generations will be very fast unless you trigger a new compilation by changing the resolution or duration of the video.\
-As you can change the prompt without causing a recompilation, this switch works quite well with th **Multiple prompts** and / or **Multiple Generations** options.
+For this switch to work you will need to install Triton and Sage attention.
 
-With the **--fastest** switch activated a 1280x720 97 frames video takes with a Lora takes less than 4 minutes to be generated !
+Please note that the first sampling step of the first video generation will talke two minutes to perform the compilation.Consecutive generations will be very fast unless you trigger a new compilation by changing the resolution or duration of the video.
+
+As you can change the prompt without causing a recompilation, this switch works quite well with th *Multiple prompts* and / or *Multiple Generations* options.
+
+With the *--fastest* switch activated **a 1280x720 97 frames video takes with a Lora takes less than 4 minutes to be generated** !
 
 
 ### Command line parameters for Gradio Server
