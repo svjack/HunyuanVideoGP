@@ -52,8 +52,6 @@ else:
 
 transformer_filename_t2v = server_config["transformer_filename"]
 transformer_filename_i2v = server_config.get("transformer_filename_i2v", transformer_choices_i2v[1]) ########
-if args.fast:
-    transformer_filename_t2v = transformer_choices_t2v[2]
 
 fast_hunyan = "fast" in transformer_filename_t2v
 text_encoder_filename = server_config["text_encoder_filename"]
@@ -76,6 +74,15 @@ else:
     lora_dir =args.lora_dir
     lora_preseleted_multiplier  = [float(i) for i in args.lora_multiplier ]
 
+default_tea_cache = 0
+if args.fast:
+    transformer_filename_t2v = transformer_choices_t2v[2]
+
+if args.fastest:
+    transformer_filename_t2v = transformer_choices_t2v[2]
+    compile="transformer"
+    attention_mode="sage"
+    default_tea_cache = 0.15
 
 #transformer_filename = "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_bf16.safetensors"
 #transformer_filename = "ckpts/hunyuan-video-t2v-720p/transformers/hunyuan_video_720_quanto_int8.safetensors"
@@ -624,7 +631,7 @@ def create_demo(model_path, save_path):
                                 ("Fast (x1.6 speed up)", 0.1), 
                                 ("Faster (x2.1 speed up)", 0.15), 
                             ],
-                            value=0,
+                            value=default_tea_cache,
                             label="Tea Cache acceleration (the faster the acceleration the higher the degradation of the quality of the video)"
                         )
 

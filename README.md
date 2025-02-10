@@ -17,6 +17,7 @@
 
 
 ## News
+* 02/10/2025: Version 3.4 New --fast and --fastest switches to automatically get the best performance
 * 02/10/2025: Version 3.3 Prefill automatically optimal parameters for Fast Hunyuan
 * 02/07/2025: Version 3.2 Added support for Xformers attention and reduce VRAM requirements for sdpa attention
 * 01/21/2025: Version 3.1 Ability to define a Loras directory and turn on / off any Lora when running the application
@@ -115,6 +116,24 @@ python3 gradio_server.py --lora-weight lora.safetensors --lora-multiplier 1
 You can also put multiple loras in the subfoler 'loras' and activate / deasactive them when running the application
 
 You can find prebuilt Loras on https://civitai.com/ or build them with tools such kohya or onetrainer.
+
+### Give me Speed !
+If you are a speed addict and  are ready to accept some tradeoff on the quality I have added two switches:
+- Fast Hunyuan Video enabled by default
+```bash
+python3 gradio_server.py --fast
+```
+
+- Fast Hunyuan Video enabled by default + Sage Attention + Compilation + Teacache (an advanced acceleration algorithm x2 the speed for a small quality cost)
+```bash
+python3 gradio_server.py --fastest
+```
+For this switch to work you will need to install Triton and Sage attention.\
+Please note that the first sampling step of the first video generation will talke two minutes to perform the compilation.\
+Consecutive generations will be very fast unless you trigger a new compilation by changing the resolution or duration of the video.\
+As you can change the prompt without causing a recompilation, this switch works quite well with th **Multiple prompts** and / or **Multiple Generations** options.
+
+With the **--fastest** switch activated a 1280x720 97 frames video takes with a Lora takes less than 4 minutes to be generated !
 
 
 ### Command line parameters for Gradio Server

@@ -125,6 +125,11 @@ def add_network_args(parser: argparse.ArgumentParser):
         help="use Fast HunyuanVideo model"
     )
 
+    group.add_argument(
+        "--fastest",
+        action="store_true",
+        help="activate the best config"
+    )
 
     # Main model
     group.add_argument(
