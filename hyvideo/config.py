@@ -119,6 +119,13 @@ def add_network_args(parser: argparse.ArgumentParser):
         help="image to video mode"
     )
 
+    group.add_argument(
+        "--fast",
+        action="store_true",
+        help="use Fast HunyuanVideo model"
+    )
+
+
     # Main model
     group.add_argument(
         "--model",

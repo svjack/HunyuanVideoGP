@@ -52,6 +52,8 @@ else:
 
 transformer_filename_t2v = server_config["transformer_filename"]
 transformer_filename_i2v = server_config.get("transformer_filename_i2v", transformer_choices_i2v[1]) ########
+if args.fast:
+    transformer_filename_t2v = transformer_choices_t2v[2]
 
 fast_hunyan = "fast" in transformer_filename_t2v
 text_encoder_filename = server_config["text_encoder_filename"]
@@ -170,9 +172,12 @@ def load_models(i2v,lora_preselected, lora_dir, lora_preseleted_multiplier ):
     pipe = hunyuan_video_sampler.pipeline
     pipe.transformer.any_compilation = len(compile)>0
 
+    kwargs = None
+    if profile == 2 or profile == 4:
+        kwargs = {"budgets": { "transformer" : 100, "*" : 3000 }} 
 
     loras, loras_names, default_loras_choices, default_loras_multis_str = setup_loras(pipe, lora_preselected, lora_dir, lora_preseleted_multiplier)
-    offloadobj = offload.profile(pipe, profile_no= profile, compile = compile, quantizeTransformer = quantizeTransformer)  
+    offloadobj = offload.profile(pipe, profile_no= profile, compile = compile, quantizeTransformer = quantizeTransformer, **kwargs)  
 
 
     return hunyuan_video_sampler, loras, loras_names, default_loras_choices, default_loras_multis_str
@@ -442,7 +447,8 @@ def create_demo(model_path, save_path):
         else:
             gr.Markdown("<div align=center><H1>HunyuanVideo<SUP>GP</SUP> - AI Text To Video Generator</H3></div>")
 
-        gr.Markdown("*Original model by Tencent, GPU Poor version by DeepBeepMeep. Generate great videos with 12 GB of VRAM or more.*")
+        gr.Markdown("<H2><B>GPU Poor version by DeepBeepMeep</B> (<A HREF='https://github.com/deepbeepmeep/HunyuanVideoGP'>Updates</A> / <A HREF='https://github.com/Tencent/HunyuanVideo'>Original by Tencent</A>).</H2>")
+
         if use_image2video:
             pass
         else:
@@ -452,7 +458,7 @@ def create_demo(model_path, save_path):
         gr.Markdown("In the worst case, one step should not take more than 2 minutes. If it is the case you may be running out of RAM / VRAM. Try to generate fewer images / lower res / a less demanding profile.")
         gr.Markdown("If you have a Linux / WSL system you may turn on compilation (see below) and will be able to generate an extra 30°% frames")
 
-        with gr.Accordion("Video Engine Configuration", open = False):
+        with gr.Accordion("Video Engine Configuration - " + ("Fast HunyuanVideo" if fast_hunyan else "HunyuanVideo") + " model currently selected", open = False):
             gr.Markdown("For the changes to be effective you will need to restart the gradio_server")
 
             with gr.Column():

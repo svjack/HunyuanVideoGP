@@ -127,6 +127,7 @@ You can find prebuilt Loras on https://civitai.com/ or build them with tools suc
 --server-port portno : default (7860) : Gradio port no\
 --server-name name : default (0.0.0.0) : Gradio server name\
 --open-browser : open automatically Browser when launching Gradio Server\
+--fast : start the app by loading Fast Hunyuan Video generator (faster but lower quality)
 
 ### Other Models for the GPU Poor
 - Hunyuan3D-2GP: https://github.com/deepbeepmeep/Hunyuan3D-2GP :\
