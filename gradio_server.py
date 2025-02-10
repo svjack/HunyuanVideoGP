@@ -52,6 +52,8 @@ else:
 
 transformer_filename_t2v = server_config["transformer_filename"]
 transformer_filename_i2v = server_config.get("transformer_filename_i2v", transformer_choices_i2v[1]) ########
+
+fast_hunyan = "fast" in transformer_filename_t2v
 text_encoder_filename = server_config["text_encoder_filename"]
 attention_mode = server_config["attention_mode"]
 profile =  force_profile_no if force_profile_no >=0 else server_config["profile"]
@@ -84,7 +86,7 @@ else:
 #attention_mode="flash"
 #attention_mode="sdpa"
 #attention_mode="xformers"
-#compile = "transformer"
+# compile = "transformer"
 
 def download_models(transformer_filename, text_encoder_filename):
     def computeList(filename):
@@ -476,7 +478,7 @@ def create_demo(model_path, save_path):
                     ],
                     value= index,
                     label="Transformer model for Image to Video",
-                    visible = True, ###############
+                    visible = False, ###############
                  )
 
                 index = text_encoder_choices.index(text_encoder_filename)
@@ -587,7 +589,7 @@ def create_demo(model_path, save_path):
                     #     ],
                     #     value=97,
                     # )
-                num_inference_steps = gr.Slider(1, 100, value=50, step=1, label="Number of Inference Steps")
+                num_inference_steps = gr.Slider(1, 100, value=6 if fast_hunyan else 50, step=1, label="Number of Inference Steps")
                 seed = gr.Number(value=42, label="Seed (-1 for random)")
                 max_frames = gr.Slider(1, 100, value=9, step=1, label="Number of input frames to use for Video2World prediction", visible=use_image2video and False) #########
     
@@ -607,7 +609,7 @@ def create_demo(model_path, save_path):
                 with gr.Row(visible=False) as advanced_row:
                     with gr.Column():
                         guidance_scale = gr.Slider(1.0, 20.0, value=1.0, step=0.5, label="Guidance Scale")
-                        flow_shift = gr.Slider(0.0, 25.0, value=7.0, step=0.1, label="Flow Shift") 
+                        flow_shift = gr.Slider(0.0, 25.0, value=17.0 if fast_hunyan else 7.0, step=0.1, label="Flow Shift") 
                         embedded_guidance_scale = gr.Slider(1.0, 20.0, value=6.0, step=0.5, label="Embedded Guidance Scale")
                         repeat_generation = gr.Slider(1, 25.0, value=1.0, step=1, label="Number of Generated Video per prompt") 
                         tea_cache_setting = gr.Dropdown(

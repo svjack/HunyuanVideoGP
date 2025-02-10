@@ -17,6 +17,7 @@
 
 
 ## News
+* 02/10/2025: Version 3.3 Prefill automatically optimal parameters for Fast Hunyuan
 * 02/07/2025: Version 3.2 Added support for Xformers attention and reduce VRAM requirements for sdpa attention
 * 01/21/2025: Version 3.1 Ability to define a Loras directory and turn on / off any Lora when running the application
 * 01/11/2025: Version 3.0 Multiple prompts / multiple generations per prompt, new progression bar, support for pretrained Loras
