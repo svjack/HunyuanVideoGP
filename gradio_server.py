@@ -143,8 +143,9 @@ def setup_loras(pipe, lora_preselected, lora_dir, lora_preseleted_multiplier):
     default_loras_choices = []
     default_loras_multis_str = ""
 
-
+    from pathlib import Path
     if len(lora_preselected) > 0:
+        lora_preselected = [  os.path.join(*Path(lora).parts)  for lora in lora_preselected]
         loras += lora_preselected
         loras_multis = (lora_preseleted_multiplier + ([1.0] * len(loras)) ) [:len(loras)]
         default_loras_choices = [ str(i) for i in range(len(loras))]
