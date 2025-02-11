@@ -17,6 +17,7 @@
 
 
 ## News
+* 02/11/2025: Version 3.5 optimized lora support (reduced VRAM requirements and faster). You can now generate 1280x720 97 frames with Loras in 3 minutes only in the fastest mode
 * 02/10/2025: Version 3.4 New --fast and --fastest switches to automatically get the best performance
 * 02/10/2025: Version 3.3 Prefill automatically optimal parameters for Fast Hunyuan
 * 02/07/2025: Version 3.2 Added support for Xformers attention and reduce VRAM requirements for sdpa attention

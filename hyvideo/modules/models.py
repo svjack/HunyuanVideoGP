@@ -167,6 +167,7 @@ class MMDoubleStreamBlock(nn.Module):
 
         # Prepare image for attention.
         img_modulated = self.img_norm1(img)
+        # img_modulated = img_modulated.to(torch.bfloat16)
         img_modulated = modulate(
             img_modulated, shift=img_mod1_shift, scale=img_mod1_scale
         )
@@ -361,6 +362,7 @@ class MMSingleStreamBlock(nn.Module):
     ) -> torch.Tensor:
         mod_shift, mod_scale, mod_gate = self.modulation(vec).chunk(3, dim=-1)
         x_mod = modulate(self.pre_norm(x), shift=mod_shift, scale=mod_scale)
+        # x_mod = x_mod.to(torch.bfloat16)
         qkv, mlp = torch.split(
             self.linear1(x_mod), [3 * self.hidden_size, self.mlp_hidden_dim], dim=-1
         )
