@@ -76,7 +76,7 @@ else:
 lock_ui_attention = False
 lock_ui_transformer = False
 lock_ui_compile = False
-
+preset = ""
 default_tea_cache = 0
 if args.fast or args.fastest:
     transformer_filename_t2v = transformer_choices_t2v[2]
@@ -84,10 +84,16 @@ if args.fast or args.fastest:
     default_tea_cache = 0.15
     lock_ui_attention = True
     lock_ui_transformer = True
+    if args.fastest:
+        preset ="Fastest preset"
+    else:
+        preset ="Fast preset"
 
 if args.fastest or args.compile:
     compile="transformer"
     lock_ui_compile = True
+    if not args.fastest:
+        preset ="Compile preset"
 
 fast_hunyan = "fast" in transformer_filename_t2v
 
@@ -187,9 +193,9 @@ def load_models(i2v,lora_preselected, lora_dir, lora_preseleted_multiplier ):
     pipe = hunyuan_video_sampler.pipeline
     pipe.transformer.any_compilation = len(compile)>0
 
-    kwargs = {}
+    kwargs = { "extraModelsToQuantize": None}
     if profile == 2 or profile == 4:
-        kwargs = {"budgets": { "transformer" : 100, "*" : 3000 }} 
+        kwargs["budgets"] = { "transformer" : 100, "*" : 3000 }
 
     loras, loras_names, default_loras_choices, default_loras_multis_str = setup_loras(pipe, lora_preselected, lora_dir, lora_preseleted_multiplier)
     offloadobj = offload.profile(pipe, profile_no= profile, compile = compile, quantizeTransformer = quantizeTransformer, **kwargs)  
@@ -217,6 +223,19 @@ def apply_changes(
                      "profile" : profile_choice,
                      "default_ui" : default_ui_choice,
                        }
+
+    if Path(server_config_filename).is_file():
+        with open(server_config_filename, "r", encoding="utf-8") as reader:
+            text = reader.read()
+        old_server_config = json.loads(text)
+        if lock_ui_transformer:
+            server_config["transformer_filename"] = old_server_config["transformer_filename"]
+            server_config["transformer_filename_i2v"] = old_server_config["transformer_filename_i2v"]
+        if lock_ui_attention:
+            server_config["attention_mode"] = old_server_config["attention_mode"]
+        if lock_ui_compile:
+            server_config["compile"] = old_server_config["compile"]
+
     with open(server_config_filename, "w", encoding="utf-8") as writer:
         writer.write(json.dumps(server_config))
 
@@ -482,9 +501,13 @@ def create_demo(model_path, save_path):
             gr.Markdown("- max 192 frames for 848 x 480 ")
             gr.Markdown("- max 97 frames for 1280 x 720")
         gr.Markdown("In order to find the sweet spot you will need try different resolution / duration and reduce these if the app is hanging : in the very worst case one generation step should not take more than 2 minutes. If it is the case you may be running out of RAM / VRAM.")
-        gr.Markdown("Please note that if your turn on compilation, the first generation step of the first video generation will be slow due to the compilation. Therefore all your tests should be done with compilation turned off ")
+        gr.Markdown("Please note that if your turn on compilation, the first generation step of the first video generation will be slow due to the compilation. Therefore all your tests should be done with compilation turned off.")
 
-        with gr.Accordion("Video Engine Configuration - " + ("Fast HunyuanVideo" if fast_hunyan else "HunyuanVideo") + " model currently selected", open = False):
+        preset_title = ("Fast HunyuanVideo model" if fast_hunyan else "HunyuanVideo model") 
+        if len(preset) > 0:
+            preset_title += " with " + preset 
+
+        with gr.Accordion("Video Engine Configuration - " + preset_title , open = False):
             gr.Markdown("For the changes to be effective you will need to restart the gradio_server. Some choices below may be locked if the app has been launched by specifying a config preset.")
 
             with gr.Column():
@@ -518,11 +541,10 @@ def create_demo(model_path, save_path):
                 index = text_encoder_choices.index(text_encoder_filename)
                 index = 0 if index ==0 else index
 
-                gr.Markdown("Note that even if you choose a 16 bits Llava model below, depending on the profile it may be automatically quantized to 8 bits on the fly")
                 text_encoder_choice = gr.Dropdown(
                     choices=[
                         ("Llava Llama 1.1 16 bits - unquantized text encoder, better quality uses more RAM", 0),
-                        ("Llava Llama 1.1 quantized to 8 bits - quantized text encoder, worse quality but uses less RAM", 1),
+                        ("Llava Llama 1.1 quantized to 8 bits - quantized text encoder, slightly worse quality but uses less RAM", 1),
                     ],
                     value= index,
                     label="Text Encoder model"
@@ -550,7 +572,7 @@ def create_demo(model_path, save_path):
                  )                
                 profile_choice = gr.Dropdown(
                     choices=[
-                ("HighRAM_HighVRAM, profile 1: at least 48 GB of RAM and 24 GB of VRAM, the fastest for shorter videos a RTX 3090 / RTX 4090", 1),
+                ("HighRAM_HighVRAM, profile 1: at least 48 GB of RAM and 24 GB of VRAM, the fastest for short videos a RTX 3090 / RTX 4090", 1),
                 ("HighRAM_LowVRAM, profile 2 (Recommended): at least 48 GB of RAM and 12 GB of VRAM, the most versatile profile with high RAM, better suited for RTX 3070/3080/4070/4080 or for RTX 3090 / RTX 4090 with large pictures batches or long videos", 2),
                 ("LowRAM_HighVRAM, profile 3: at least 32 GB of RAM and 24 GB of VRAM, adapted for RTX 3090 / RTX 4090 with limited RAM for good speed short video",3),
                 ("LowRAM_LowVRAM, profile 4 (Default): at least 32 GB of RAM and 12 GB of VRAM, if you have little VRAM or want to generate longer videos",4),
