@@ -447,7 +447,8 @@ def generate_video(
                         end_time = time.time()
                         yield f"Total Generation Time: {end_time-start_time:.1f}s"
             seed += 1
-            del outputs, samples, sample
+            if outputs!= None:
+                del outputs, samples, sample
             offload.last_offload_obj.unload_all()
             gc.collect()
             torch.cuda.empty_cache()
