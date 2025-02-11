@@ -474,7 +474,7 @@ def create_demo(model_path, save_path):
         else:
             gr.Markdown("Please be aware of these limits with profiles 2 and 4 if you have 24 GB of VRAM (RTX 3090 / RTX 4090):")
             gr.Markdown("- max 192 frames for 848 x 480 ")
-            gr.Markdown("- max 86 frames for 1280 x 720")
+            gr.Markdown("- max 97 frames for 1280 x 720")
         gr.Markdown("In the worst case, one step should not take more than 2 minutes. If it is the case you may be running out of RAM / VRAM. Try to generate fewer images / lower res / a less demanding profile.")
         gr.Markdown("If you have a Linux / WSL system you may turn on compilation (see below) and will be able to generate an extra 30°% frames")
 
