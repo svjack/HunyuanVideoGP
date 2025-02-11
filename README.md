@@ -86,60 +86,44 @@ Note that *Flash attention* and *Sage attention* are quite complex to install on
 Likewise *Pytorch Compilation* will work on Windows only if you manage to install Triton. It is quite a complex process I will try to provide a script in the future.
 
 ## Run the application
-### Profiles
-You can choose between 5 profiles depending on your hardware:
-- HighRAM_HighVRAM  (1): at least 48 GB of RAM and 24 GB of VRAM : the fastest well suited for a RTX 3090 / RTX 4090 but consumes much more VRAM, adapted for fast shorter video
-- HighRAM_LowVRAM  (2): at least 48 GB of RAM and 12 GB of VRAM : a bit slower, better suited for RTX 3070/3080/4070/4080 or for RTX 3090 / RTX 4090 with large pictures batches or long videos
-- LowRAM_HighVRAM  (3): at least 32 GB of RAM and 24 GB of VRAM : adapted for RTX 3090 / RTX 4090 with limited RAM  but at the cost of VRAM (shorter videos)
-- LowRAM_LowVRAM  (4): at least 32 GB of RAM and 12 GB of VRAM :  if you have little VRAM or want to generate longer videos 
-- VerylowRAM_LowVRAM  (5): at least 24 GB of RAM and 10 GB of VRAM : if you don't have much it won't be fast but maybe it will work
-
-Profile 2 (High RAM) and 4 (Low RAM)are the most recommended profiles since they are versatile (support for long videos for a slight performance cost).\
-However, a safe approach is to start from profile 5 (default profile) and then go down progressively to profile 4 and then to profile 2 as long as the app remains responsive or doesn't trigger any out of memory error.
-
 
 ### Run a Gradio Server on port 7860 (recommended)
 ```bash
-python3 gradio_server.py
+python gradio_server.py
 ```
 
-You will have the possibility to configure a RAM / VRAM profile by expanding the section *Video Engine Configuration* in the Web Interface.\
-If by mistake you have chosen a configuration not supported by your system, you can force a profile while loading the app with the safe profile 5:  
+Every lora stored in the subfoler 'loras' will be automatically loaded. You will be then able to activate / desactive any of them when running the application
+
+You can also pre activate some loras and specify their corresponding multipliers when loading the app:
 ```bash
-python3 gradio_server.py --profile 5
+python gradio_server.py --lora-weight lora.safetensors --lora-multiplier 1
 ```
 
-Do the following to load a prequantized Lora:
-```bash
-python3 gradio_server.py --lora-weight lora.safetensors --lora-multiplier 1
-```
-
-You can also put multiple loras in the subfoler 'loras' and activate / deasactive them when running the application
 
 You can find prebuilt Loras on https://civitai.com/ or build them with tools such kohya or onetrainer.
 
 ### Give me Speed !
-If you are a speed addict and  are ready to accept some tradeoff on the quality I have added two switches:
-- Fast Hunyuan Video enabled by default
+If you are a speed addict and are ready to accept some tradeoff on the quality I have added two switches:
+- Fast Hunyuan Video enabled by default + Sage Attention + Teacache (an advanced acceleration algorithm x2 the speed for a small quality cost)
 ```bash
-python3 gradio_server.py --fast
+python gradio_server.py --fast
 ```
 
-- Fast Hunyuan Video enabled by default + Sage Attention + Compilation + Teacache (an advanced acceleration algorithm x2 the speed for a small quality cost)
+- Fast Hunyuan Video enabled by default + Sage Attention + Teacache (an advanced acceleration algorithm x2 the speed for a small quality cost) + Compilation  
 ```bash
-python3 gradio_server.py --fastest
+python gradio_server.py --fastest
 ```
-For this switch to work you will need to install Triton and Sage attention.
+Please note that the first sampling step of the first video generation will talke two minutes to perform the compilation. Consecutive generations will be very fast unless you trigger a new compilation by changing the resolution, duration of the video or add / remove loras.
 
-Please note that the first sampling step of the first video generation will talke two minutes to perform the compilation.Consecutive generations will be very fast unless you trigger a new compilation by changing the resolution or duration of the video.
+For these two switches to work you will need to install Triton and Sage attention.
 
-As you can change the prompt without causing a recompilation, this switch works quite well with th *Multiple prompts* and / or *Multiple Generations* options.
+As you can change the prompt without causing a recompilation, theses switches work quite well with th *Multiple prompts* and / or *Multiple Generations* options.
 
 With the *--fastest* switch activated **a 1280x720 97 frames video takes with a Lora takes less than 4 minutes to be generated** !
 
 
 ### Command line parameters for Gradio Server
---profile no : default (5) : no of profile between 1 and 5\
+--profile no : default (4) : no of profile between 1 and 5\
 --quantize-transformer bool: (default True) : enable / disable on the fly transformer quantization\
 --lora-dir path : Path of directory that contains Loras in diffusers / safetensor format\
 --lora-weight path1 path2 ... : list of Loras Path preselected Loras\
@@ -148,7 +132,20 @@ With the *--fastest* switch activated **a 1280x720 97 frames video takes with a 
 --server-port portno : default (7860) : Gradio port no\
 --server-name name : default (0.0.0.0) : Gradio server name\
 --open-browser : open automatically Browser when launching Gradio Server\
---fast : start the app by loading Fast Hunyuan Video generator (faster but lower quality)
+--fast : start the app by loading Fast Hunyuan Video generator (faster but lower quality) + sage attention + teacache x2 
+--compile : turn on pytorch compilation
+--fastest : shortcut for --fast + --compile
+
+### Profiles (for power users only)
+You can choose between 5 profiles, these will try to leverage the most your hardware, but have little impact for HunyuanVideo GP:
+- HighRAM_HighVRAM  (1):  the fastest well suited for a RTX 3090 / RTX 4090 but consumes much more VRAM, adapted for fast shorter video
+- HighRAM_LowVRAM  (2): a bit slower, better suited for RTX 3070/3080/4070/4080 or for RTX 3090 / RTX 4090 with large pictures batches or long videos
+- LowRAM_HighVRAM  (3): adapted for RTX 3090 / RTX 4090 with limited RAM  but at the cost of VRAM (shorter videos)
+- LowRAM_LowVRAM  (4): if you have little VRAM or want to generate longer videos 
+- VerylowRAM_LowVRAM  (5): at least 24 GB of RAM and 10 GB of VRAM : if you don't have much it won't be fast but maybe it will work
+
+Profile 2 (High RAM) and 4 (Low RAM)are the most recommended profiles since they are versatile (support for long videos for a slight performance cost).\
+However, a safe approach is to start from profile 5 (default profile) and then go down progressively to profile 4 and then to profile 2 as long as the app remains responsive or doesn't trigger any out of memory error.
 
 ### Other Models for the GPU Poor
 - Hunyuan3D-2GP: https://github.com/deepbeepmeep/Hunyuan3D-2GP :\
@@ -173,7 +170,7 @@ A great song generator (instruments + singer's voice) based on prompted Lyrics a
 ```bash
 cd HunyuanVideo
 
-python3 sample_video.py \
+python sample_video.py \
     --video-size 720 1280 \
     --video-length 129 \
     --infer-steps 50 \

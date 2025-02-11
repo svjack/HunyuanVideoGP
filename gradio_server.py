@@ -73,15 +73,21 @@ else:
     lora_dir =args.lora_dir
     lora_preseleted_multiplier  = [float(i) for i in args.lora_multiplier ]
 
-default_tea_cache = 0
-if args.fast:
-    transformer_filename_t2v = transformer_choices_t2v[2]
+lock_ui_attention = False
+lock_ui_transformer = False
+lock_ui_compile = False
 
-if args.fastest:
+default_tea_cache = 0
+if args.fast or args.fastest:
     transformer_filename_t2v = transformer_choices_t2v[2]
-    compile="transformer"
     attention_mode="sage"
     default_tea_cache = 0.15
+    lock_ui_attention = True
+    lock_ui_transformer = True
+
+if args.fastest or args.compile:
+    compile="transformer"
+    lock_ui_compile = True
 
 fast_hunyan = "fast" in transformer_filename_t2v
 
@@ -472,14 +478,14 @@ def create_demo(model_path, save_path):
         if use_image2video:
             pass
         else:
-            gr.Markdown("Please be aware of these limits with profiles 2 and 4 if you have 24 GB of VRAM (RTX 3090 / RTX 4090):")
+            gr.Markdown("The resolution and the duration of the video will depend on the amount of VRAM your GPU has, for instance if you have 24 GB of VRAM (RTX 3090 / RTX 4090):")
             gr.Markdown("- max 192 frames for 848 x 480 ")
             gr.Markdown("- max 97 frames for 1280 x 720")
-        gr.Markdown("In the worst case, one step should not take more than 2 minutes. If it is the case you may be running out of RAM / VRAM. Try to generate fewer images / lower res / a less demanding profile.")
-        gr.Markdown("If you have a Linux / WSL system you may turn on compilation (see below) and will be able to generate an extra 30°% frames")
+        gr.Markdown("In order to find the sweet spot you will need try different resolution / duration and reduce these if the app is hanging : in the very worst case one generation step should not take more than 2 minutes. If it is the case you may be running out of RAM / VRAM.")
+        gr.Markdown("Please note that if your turn on compilation, the first generation step of the first video generation will be slow due to the compilation. Therefore all your tests should be done with compilation turned off ")
 
         with gr.Accordion("Video Engine Configuration - " + ("Fast HunyuanVideo" if fast_hunyan else "HunyuanVideo") + " model currently selected", open = False):
-            gr.Markdown("For the changes to be effective you will need to restart the gradio_server")
+            gr.Markdown("For the changes to be effective you will need to restart the gradio_server. Some choices below may be locked if the app has been launched by specifying a config preset.")
 
             with gr.Column():
                 index = transformer_choices_t2v.index(transformer_filename_t2v)
@@ -491,7 +497,8 @@ def create_demo(model_path, save_path):
                         ("Fast Hunyuan Text to Video quantized to 8 bits - requires less than 10 steps but worse quality", 2), 
                     ],
                     value= index,
-                    label="Transformer model for Text to Video"
+                    label="Transformer model for Text to Video",
+                    interactive= not lock_ui_transformer
                  )
 
                 index = transformer_choices_i2v.index(transformer_filename_i2v)
@@ -504,6 +511,7 @@ def create_demo(model_path, save_path):
                     ],
                     value= index,
                     label="Transformer model for Image to Video",
+                    interactive= not lock_ui_transformer,
                     visible = False, ###############
                  )
 
@@ -527,7 +535,8 @@ def create_demo(model_path, save_path):
                         ("Sage: 30% faster but worse quality - requires additional install (usually complex to set up on Windows without WSL)", "sage"),
                     ],
                     value= attention_mode,
-                    label="Attention Type"
+                    label="Attention Type",
+                    interactive= not lock_ui_attention
                  )
                 gr.Markdown("Beware: when restarting the server or changing a resolution or video duration, the first step of generation for a duration / resolution may last a few minutes due to recompilation")
                 compile_choice = gr.Dropdown(
@@ -536,7 +545,8 @@ def create_demo(model_path, save_path):
                         ("OFF: no other choice if you have Windows without using WSL", "" ),
                     ],
                     value= compile,
-                    label="Compile Transformer (up to 50% faster and 30% more frames but requires Linux / WSL and Flash or Sage attention)"
+                    label="Compile Transformer (up to 50% faster and 30% more frames but requires Linux / WSL and Flash or Sage attention)",
+                    interactive= not lock_ui_compile
                  )                
                 profile_choice = gr.Dropdown(
                     choices=[
@@ -547,7 +557,7 @@ def create_demo(model_path, save_path):
                 ("VerylowRAM_LowVRAM, profile 5: (Fail safe): at least 16 GB of RAM and 10 GB of VRAM, if you don't have much it won't be fast but maybe it will work",5)
                     ],
                     value= profile,
-                    label="Profile"
+                    label="Profile (for power users only, not needed to change it)"
                  )
 
                 default_ui_choice = gr.Dropdown(
@@ -556,7 +566,8 @@ def create_demo(model_path, save_path):
                         ("Image to Video", "i2v"),
                     ],
                     value= default_ui,
-                    label="Default mode when launching the App if not '--t2v' ot '--i2v' switch is specified when launching the server "
+                    label="Default mode when launching the App if not '--t2v' ot '--i2v' switch is specified when launching the server ",
+                    visible= False ############
                  )                
 
                 msg = gr.Markdown()            

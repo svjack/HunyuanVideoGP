@@ -120,6 +120,12 @@ def add_network_args(parser: argparse.ArgumentParser):
     )
 
     group.add_argument(
+        "--compile",
+        action="store_true",
+        help="Enable pytorch compilation"
+    )
+
+    group.add_argument(
         "--fast",
         action="store_true",
         help="use Fast HunyuanVideo model"
