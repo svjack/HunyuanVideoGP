@@ -414,13 +414,19 @@ def generate_video(
                 )
 
             samples = outputs['samples']
-            
+            if samples != None:
+                samples = samples.to("cpu")
+            outputs['samples'] = None
+            offload.last_offload_obj.unload_all()
+            gc.collect()
+            torch.cuda.empty_cache()
+
             if samples == None:
                 end_time = time.time()
                 yield f"Video generation was aborted. Total Generation Time: {end_time-start_time:.1f}s"
             else:
                 idx = 0
-                # just in case one day we will have enough VRAM for batch geeneration ...
+                # just in case one day we will have enough VRAM for batch generation ...
                 for i,sample in enumerate(samples):
                     # sample = samples[0]
                     video = rearrange(sample.cpu().numpy(), "c t h w -> t h w c")
@@ -447,12 +453,7 @@ def generate_video(
                         end_time = time.time()
                         yield f"Total Generation Time: {end_time-start_time:.1f}s"
             seed += 1
-            if outputs!= None:
-                del outputs, samples, sample
-            offload.last_offload_obj.unload_all()
-            gc.collect()
-            torch.cuda.empty_cache()
-
+  
     if temp_filename!= None and  os.path.isfile(temp_filename):
         os.remove(temp_filename)
 
