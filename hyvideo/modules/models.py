@@ -697,7 +697,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
 
         any_compilation = getattr(self, "any_compilation", False)
         if self.attention_mode == "sdpa":
-            if x.shape[0] == 1 and not any_compilation: # if compilation is set, the trick used to make sdpa work will invalidate the compilation cache if one changes the prompt (due to changing tensor shapes)            
+            if x.shape[0] == 1: # and not any_compilation: # if compilation is set, the trick used to make sdpa work will invalidate the compilation cache if one changes the prompt (due to changing tensor shapes)            
                 # newly improved masking code that doesn't require a cumbersome mask....
                 text_len = text_mask[0].sum().item()
                 total_len = text_len + img_seq_len
