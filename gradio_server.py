@@ -295,6 +295,10 @@ def generate_video(
     from PIL import Image
     import numpy as np
     import tempfile
+    import torch
+    import gc
+
+
     temp_filename = None
     if use_image2video:
         if image_to_continue is not None:
@@ -389,7 +393,8 @@ def generate_video(
                 # input_image_or_video_path
                 raise Exception("image 2 video not yet supported") #################
             else:
-
+                gc.collect()
+                torch.cuda.empty_cache()
                 outputs = hunyuan_video_sampler.predict(
                     prompt=prompt,
                     height=height,
@@ -412,7 +417,7 @@ def generate_video(
             
             if samples == None:
                 end_time = time.time()
-                yield f"Abortion Succesful. Total Generation Time: {end_time-start_time:.1f}s"
+                yield f"Video generation was aborted. Total Generation Time: {end_time-start_time:.1f}s"
             else:
                 idx = 0
                 # just in case one day we will have enough VRAM for batch geeneration ...
@@ -442,6 +447,10 @@ def generate_video(
                         end_time = time.time()
                         yield f"Total Generation Time: {end_time-start_time:.1f}s"
             seed += 1
+            del outputs, samples, sample
+            offload.last_offload_obj.unload_all()
+            gc.collect()
+            torch.cuda.empty_cache()
 
     if temp_filename!= None and  os.path.isfile(temp_filename):
         os.remove(temp_filename)
