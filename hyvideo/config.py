@@ -137,6 +137,12 @@ def add_network_args(parser: argparse.ArgumentParser):
         help="activate the best config"
     )
 
+    group.add_argument(
+    "--attention",
+    type=str,
+    default="",
+    help="attention mode"
+    )
     # Main model
     group.add_argument(
         "--model",

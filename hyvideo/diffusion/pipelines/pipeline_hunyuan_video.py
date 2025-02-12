@@ -1002,7 +1002,7 @@ class HunyuanVideoPipeline(DiffusionPipeline):
                 with torch.autocast(
                     device_type="cuda", dtype=target_dtype, enabled=autocast_enabled
                 ):
-                    noise_pred = self.transformer(  # For an input image (129, 192, 336) (1, 256, 256)
+                    ret = self.transformer(  # For an input image (129, 192, 336) (1, 256, 256)
                         latent_model_input,  # [2, 16, 33, 24, 42]
                         t_expand,  # [2]
                         text_states=prompt_embeds,  # [2, 256, 4096]
@@ -1011,10 +1011,13 @@ class HunyuanVideoPipeline(DiffusionPipeline):
                         freqs_cos=freqs_cis[0],  # [seqlen, head_dim]
                         freqs_sin=freqs_cis[1],  # [seqlen, head_dim]
                         guidance=guidance_expand,
+                        pipeline=self,
                         return_dict=True,
-                    )[
-                        "x"
-                    ]
+                    )
+                    
+                    if self._interrupt:
+                        return [None]
+                    noise_pred= ret["x"]
 
                 # perform guidance
                 if self.do_classifier_free_guidance:

@@ -34,6 +34,18 @@ try:
 except ImportError:
     sageattn_varlen_wrapper = None
 
+
+def get_attention_modes():
+    ret = ["sdpa"]
+    if flash_attn != None:
+        ret.append("flash")
+    if memory_efficient_attention != None:
+        ret.append("xformers")
+    if sageattn_varlen_wrapper != None:
+        ret.append("sage")
+    return ret
+
+
 MEMORY_LAYOUT = {
     "sdpa": (
         lambda x: x.transpose(1, 2),

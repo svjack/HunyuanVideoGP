@@ -17,6 +17,7 @@
 
 
 ## News
+* 02/11/2025: Version 4.0 Quality of life features: fast abort video generation, detect automatically attention modes not supported, you can now change video engine parameters without having to restart the app
 * 02/11/2025: Version 3.5 optimized lora support (reduced VRAM requirements and faster). You can now generate 1280x720 97 frames with Loras in 3 minutes only in the fastest mode
 * 02/10/2025: Version 3.4 New --fast and --fastest switches to automatically get the best performance
 * 02/10/2025: Version 3.3 Prefill automatically optimal parameters for Fast Hunyuan
@@ -135,6 +136,7 @@ With the *--fastest* switch activated **a 1280x720 97 frames video takes with a 
 --fast : start the app by loading Fast Hunyuan Video generator (faster but lower quality) + sage attention + teacache x2 
 --compile : turn on pytorch compilation
 --fastest : shortcut for --fast + --compile
+--attention mode: force attention mode among, sdpa, flash, sage and xformers
 
 ### Profiles (for power users only)
 You can choose between 5 profiles, these will try to leverage the most your hardware, but have little impact for HunyuanVideo GP:

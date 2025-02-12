@@ -14,13 +14,20 @@ from hyvideo.utils.file_utils import save_videos_grid
 from hyvideo.config import parse_args
 from hyvideo.inference import HunyuanVideoSampler
 from hyvideo.constants import NEGATIVE_PROMPT
+from hyvideo.modules.attenion import get_attention_modes
 from mmgp import offload, safetensors2, profile_type 
+import torch
+import gc
 
+attention_modes_supported = get_attention_modes()
 
 args = parse_args()
 args.flow_reverse = True
 
 
+lock_ui_attention = False
+lock_ui_transformer = False
+lock_ui_compile = False
 
 
 force_profile_no = int(args.profile)
@@ -55,6 +62,13 @@ transformer_filename_i2v = server_config.get("transformer_filename_i2v", transfo
 
 text_encoder_filename = server_config["text_encoder_filename"]
 attention_mode = server_config["attention_mode"]
+if len(args.attention)> 0:
+    if args.attention in ["sdpa", "sage", "flash", "xformers"]:
+        attention_mode = args.attention
+        lock_ui_attention = True
+    else:
+        raise Exception(f"Unknown attention mode '{args.attention}'")
+
 profile =  force_profile_no if force_profile_no >=0 else server_config["profile"]
 compile = server_config.get("compile", "")
 default_ui = server_config.get("default_ui", "t2v") 
@@ -73,10 +87,6 @@ else:
     lora_dir =args.lora_dir
     lora_preseleted_multiplier  = [float(i) for i in args.lora_multiplier ]
 
-lock_ui_attention = False
-lock_ui_transformer = False
-lock_ui_compile = False
-preset = ""
 default_tea_cache = 0
 if args.fast or args.fastest:
     transformer_filename_t2v = transformer_choices_t2v[2]
@@ -84,16 +94,10 @@ if args.fast or args.fastest:
     default_tea_cache = 0.15
     lock_ui_attention = True
     lock_ui_transformer = True
-    if args.fastest:
-        preset ="Fastest preset"
-    else:
-        preset ="Fast preset"
 
 if args.fastest or args.compile:
     compile="transformer"
     lock_ui_compile = True
-    if not args.fastest:
-        preset ="Compile preset"
 
 fast_hunyan = "fast" in transformer_filename_t2v
 
@@ -201,11 +205,28 @@ def load_models(i2v,lora_preselected, lora_dir, lora_preseleted_multiplier ):
     offloadobj = offload.profile(pipe, profile_no= profile, compile = compile, quantizeTransformer = quantizeTransformer, **kwargs)  
 
 
-    return hunyuan_video_sampler, loras, loras_names, default_loras_choices, default_loras_multis_str
+    return hunyuan_video_sampler, offloadobj, loras, loras_names, default_loras_choices, default_loras_multis_str
 
-hunyuan_video_sampler,  loras, loras_names, default_loras_choices, default_loras_multis_str = load_models(use_image2video,lora_preselected, lora_dir, lora_preseleted_multiplier )
+hunyuan_video_sampler, offloadobj,  loras, loras_names, default_loras_choices, default_loras_multis_str = load_models(use_image2video,lora_preselected, lora_dir, lora_preseleted_multiplier )
+gen_in_progress = False
 
-def apply_changes(
+def get_default_steps_flow(fast_hunyan):
+    return 6 if fast_hunyan else 30, 17.0 if fast_hunyan else 7.0 
+
+def generate_header(fast_hunyan, compile, attention_mode):
+    header = "<H2 ALIGN=CENTER><SPAN> ----------------- "
+    header += "Fast HunyuanVideo model" if fast_hunyan else "HunyuanVideo model" 
+    header += " (attention mode: " + attention_mode
+    if attention_mode not in attention_modes_supported:
+        header += " -NOT INSTALLED-"
+
+    if compile:
+        header += ", pytorch compilation ON"
+    header += ") -----------------</SPAN></H2>"
+
+    return header
+
+def apply_changes(  state,
                     transformer_t2v_choice,
                     transformer_i2v_choice,
                     text_encoder_choice,
@@ -214,7 +235,11 @@ def apply_changes(
                     profile_choice,
                     default_ui_choice ="t2v",
 ):
-    global offloadobj, hunyuan_video_sampler
+
+    if gen_in_progress:
+        yield "<DIV ALIGN=CENTER>Unable to change config when a generation is in progress</DIV>"
+        return
+    global offloadobj, hunyuan_video_sampler, loras, loras_names, default_loras_choices, default_loras_multis_str
     server_config = {"attention_mode" : attention_choice,  
                      "transformer_filename": transformer_choices_t2v[transformer_t2v_choice], 
                      "transformer_filename_i2v": transformer_choices_i2v[transformer_i2v_choice],  ##########
@@ -239,11 +264,63 @@ def apply_changes(
     with open(server_config_filename, "w", encoding="utf-8") as writer:
         writer.write(json.dumps(server_config))
 
-    # hunyuan_video_sampler = None
-    # offload.release(offloadobj)
-    # hunyuan_video_sampler,  loras, loras_names, default_loras_choices, default_loras_multis_str = load_models(use_image2video,lora_preselected, lora_dir, lora_preseleted_multiplier )
+    changes = []
+    for k, v in server_config.items():
+        v_old = old_server_config[k]
+        if v != v_old:
+            changes.append(k)
 
-    return "<h1>New Config file created. Please restart the Gradio Server</h1>"
+    state["config_changes"] = changes
+    state["config_new"] = server_config
+    state["config_old"] = old_server_config
+
+    global attention_mode, profile, compile, transformer_filename, transformer_filename_i2v, text_encoder_filename
+    attention_mode = server_config["attention_mode"]
+    profile = server_config["profile"]
+    compile = server_config["compile"]
+    transformer_filename = server_config["transformer_filename"]
+    transformer_filename_i2v = server_config["transformer_filename_i2v"]
+    text_encoder_filename = server_config["text_encoder_filename"]
+
+    if  all(change in ["attention_mode"] for change in changes ):
+        if "attention_mode" in changes:
+            # quick attention mode update to avoid reinitializing everything
+            transformer = hunyuan_video_sampler.pipeline.transformer
+            transformer.attention_mode = attention_mode
+            for module in transformer.double_blocks:
+                module.attention_mode = attention_mode
+            for module in transformer.single_blocks:
+                module.attention_mode = attention_mode
+
+    else:
+        hunyuan_video_sampler = None
+        offloadobj.release()
+        offloadobj = None
+        yield "<DIV ALIGN=CENTER>Please wait while the new configuration is being applied</DIV>"
+
+        hunyuan_video_sampler, offloadobj,  loras, loras_names, default_loras_choices, default_loras_multis_str = load_models(use_image2video,lora_preselected, lora_dir, lora_preseleted_multiplier )
+
+
+    yield "<DIV ALIGN=CENTER>The new configuration has been succesfully applied</DIV>"
+
+    # return "<DIV ALIGN=CENTER>New Config file created. Please restart the Gradio Server</DIV>"
+
+def update_defaults(state, num_inference_steps,flow_shift):
+    if "config_changes" not in state:
+        return get_default_steps_flow(False)
+    changes = state["config_changes"] 
+    server_config = state["config_new"] 
+    old_server_config = state["config_old"] 
+
+    new_fast_hunyuan = "fast" in server_config["transformer_filename"]
+    old_fast_hunyuan = "fast" in old_server_config["transformer_filename"]
+
+    if  "transformer_filename" in changes:
+        if new_fast_hunyuan != old_fast_hunyuan:
+            num_inference_steps, flow_shift = get_default_steps_flow(new_fast_hunyuan)
+
+    header = generate_header(new_fast_hunyuan, server_config["compile"], server_config["attention_mode"] )
+    return num_inference_steps, flow_shift, header 
 
 
 from moviepy.editor import ImageSequenceClip
@@ -259,7 +336,7 @@ def build_callback(state, pipe, progress, status, num_inference_steps):
     def callback(step_idx, t, latents):
         step_idx += 1         
         if state.get("abort", False):
-            pipe._interrupt = True
+            # pipe._interrupt = True
             status_msg = status + " - Aborting"    
         elif step_idx  == num_inference_steps:
             status_msg = status + " - VAE Decoding"    
@@ -273,6 +350,7 @@ def build_callback(state, pipe, progress, status, num_inference_steps):
 def abort_generation(state):
     if "in_progress" in state:
         state["abort"] = True
+        hunyuan_video_sampler.pipeline._interrupt= True
         return gr.Button(interactive=  False)
     else:
         return gr.Button(interactive=  True)
@@ -286,7 +364,9 @@ def finalize_gallery(state):
     if "in_progress" in state:
         del state["in_progress"]
         choice = state.get("selected",0)
+    
     time.sleep(0.2)
+    gen_in_progress = False
     return gr.Gallery(selected_index=choice), gr.Button(interactive=  True)
 
 def select_video(state , event_data: gr.EventData):
@@ -320,10 +400,16 @@ def generate_video(
     from PIL import Image
     import numpy as np
     import tempfile
-    import torch
-    import gc
 
 
+    if hunyuan_video_sampler == None:
+        raise gr.Error("Unable to generate a Video while a new configuration is being applied.")
+    if not attention_mode in attention_modes_supported:
+        raise gr.Error(f"You have selected attention mode '{attention_mode}'. However it is not installed on your system. You should either install it or switch to the default 'sdpa' attention.")
+
+
+    global gen_in_progress
+    gen_in_progress = True
     temp_filename = None
     if use_image2video:
         if image_to_continue is not None:
@@ -404,10 +490,12 @@ def generate_video(
     prompts = prompt.replace("\r", "").split("\n")
     video_no = 0
     total_video =  repeat_generation * len(prompts)
-
+    abort = False
     start_time = time.time()
     for prompt in prompts:
         for _ in range(repeat_generation):
+            if abort:
+                break
             video_no += 1
             status = f"Video {video_no}/{total_video}"
             progress(0, desc=status + " - Encoding Prompt" )   
@@ -420,23 +508,30 @@ def generate_video(
             else:
                 gc.collect()
                 torch.cuda.empty_cache()
-                outputs = hunyuan_video_sampler.predict(
-                    prompt=prompt,
-                    height=height,
-                    width=width, 
-                    video_length=(video_length // 4)* 4 + 1 ,
-                    seed=seed,
-                    negative_prompt=negative_prompt,
-                    infer_steps=num_inference_steps,
-                    guidance_scale=guidance_scale,
-                    num_videos_per_prompt=1,
-                    flow_shift=flow_shift,
-                    batch_size=1,
-                    embedded_guidance_scale=embedded_guidance_scale,
-                    callback = callback,
-                    callback_steps = 1,
+                try:
+                    outputs = hunyuan_video_sampler.predict(
+                        prompt=prompt,
+                        height=height,
+                        width=width, 
+                        video_length=(video_length // 4)* 4 + 1 ,
+                        seed=seed,
+                        negative_prompt=negative_prompt,
+                        infer_steps=num_inference_steps,
+                        guidance_scale=guidance_scale,
+                        num_videos_per_prompt=1,
+                        flow_shift=flow_shift,
+                        batch_size=1,
+                        embedded_guidance_scale=embedded_guidance_scale,
+                        callback = callback,
+                        callback_steps = 1,
 
-                )
+                    )
+                except:
+                    if temp_filename!= None and  os.path.isfile(temp_filename):
+                        os.remove(temp_filename)
+                    gen_in_progress = False
+                    raise gr.Error("The generation of the video has encountered an error: it is likely that you have unsufficient VRAM and you should therefore reduce the video resolution or its number of frames.")
+
 
             samples = outputs['samples']
             if samples != None:
@@ -448,6 +543,7 @@ def generate_video(
 
             if samples == None:
                 end_time = time.time()
+                abort = True
                 yield f"Video generation was aborted. Total Generation Time: {end_time-start_time:.1f}s"
             else:
                 idx = 0
@@ -481,18 +577,21 @@ def generate_video(
   
     if temp_filename!= None and  os.path.isfile(temp_filename):
         os.remove(temp_filename)
+    gen_in_progress = False
 
-
-
-def create_demo(model_path, save_path):
+def create_demo():
+    
+    default_inference_steps, default_flow_shift = get_default_steps_flow(fast_hunyan)
     
     with gr.Blocks() as demo:
+        state = gr.State({})
+       
         if use_image2video:
-            gr.Markdown("<div align=center><H1>HunyuanVideo<SUP>GP</SUP> - AI Image To Video Generator</H3></div>")
+            gr.Markdown("<div align=center><H1>HunyuanVideo<SUP>GP</SUP> - AI Image To Video Generator</H1></div>")
         else:
-            gr.Markdown("<div align=center><H1>HunyuanVideo<SUP>GP</SUP> - AI Text To Video Generator</H3></div>")
+            gr.Markdown("<div align=center><H1>HunyuanVideo<SUP>GP</SUP> - AI Text To Video Generator</H1></div>")
 
-        gr.Markdown("<H2><B>GPU Poor version by DeepBeepMeep</B> (<A HREF='https://github.com/deepbeepmeep/HunyuanVideoGP'>Updates</A> / <A HREF='https://github.com/Tencent/HunyuanVideo'>Original by Tencent</A>).</H2>")
+        gr.Markdown("<H2><B>GPU Poor version by DeepBeepMeep</B> (<A HREF='https://github.com/deepbeepmeep/HunyuanVideoGP'>Updates</A> / <A HREF='https://github.com/Tencent/HunyuanVideo'>Original by Tencent</A>).</H>")
 
         if use_image2video:
             pass
@@ -503,11 +602,15 @@ def create_demo(model_path, save_path):
         gr.Markdown("In order to find the sweet spot you will need try different resolution / duration and reduce these if the app is hanging : in the very worst case one generation step should not take more than 2 minutes. If it is the case you may be running out of RAM / VRAM.")
         gr.Markdown("Please note that if your turn on compilation, the first generation step of the first video generation will be slow due to the compilation. Therefore all your tests should be done with compilation turned off.")
 
-        preset_title = ("Fast HunyuanVideo model" if fast_hunyan else "HunyuanVideo model") 
-        if len(preset) > 0:
-            preset_title += " with " + preset 
 
-        with gr.Accordion("Video Engine Configuration - " + preset_title , open = False):
+        # css = """<STYLE>
+        #         h2 { width: 100%;  text-align: center; border-bottom: 1px solid #000; line-height: 0.1em; margin: 10px 0 20px;  } 
+        #         h2 span {background:#fff;  padding:0 10px; }</STYLE>"""
+        # gr.HTML(css)
+
+        header = gr.Markdown(generate_header(fast_hunyan, compile, attention_mode)  )            
+
+        with gr.Accordion("Video Engine Configuration - click here to change it", open = False):
             gr.Markdown("For the changes to be effective you will need to restart the gradio_server. Some choices below may be locked if the app has been launched by specifying a config preset.")
 
             with gr.Column():
@@ -549,12 +652,17 @@ def create_demo(model_path, save_path):
                     value= index,
                     label="Text Encoder model"
                  )
+                def check(mode): 
+                    if not mode in attention_modes_supported:
+                        return " (NOT INSTALLED)"
+                    else:
+                        return ""
                 attention_choice = gr.Dropdown(
                     choices=[
                         ("Scale Dot Product Attention: default", "sdpa"),
-                        ("Flash: good quality - requires additional install (usually complex to set up on Windows without WSL)", "flash"),
-                        ("Xformers: good quality - requires additional install (usually complex, may consume less VRAM to set up on Windows without WSL)", "xformers"),
-                        ("Sage: 30% faster but worse quality - requires additional install (usually complex to set up on Windows without WSL)", "sage"),
+                        ("Flash" + check("flash")+ ": good quality - requires additional install (usually complex to set up on Windows without WSL)", "flash"),
+                        ("Xformers" + check("xformers")+ ": good quality - requires additional install (usually complex, may consume less VRAM to set up on Windows without WSL)", "xformers"),
+                        ("Sage" + check("sage")+ ": 30% faster but worse quality - requires additional install (usually complex to set up on Windows without WSL)", "sage"),
                     ],
                     value= attention_mode,
                     label="Attention Type",
@@ -595,19 +703,6 @@ def create_demo(model_path, save_path):
                 msg = gr.Markdown()            
                 apply_btn  = gr.Button("Apply Changes")
 
-                apply_btn.click(
-                        fn=apply_changes,
-                        inputs=[
-                            transformer_t2v_choice,
-                            transformer_i2v_choice,
-                            text_encoder_choice,
-                            attention_choice,
-                            compile_choice,                            
-                            profile_choice,
-                            default_ui_choice,
-                        ],
-                        outputs= msg
-                    )
 
         with gr.Row():
             with gr.Column():
@@ -648,7 +743,7 @@ def create_demo(model_path, save_path):
                     #     ],
                     #     value=97,
                     # )
-                num_inference_steps = gr.Slider(1, 100, value=6 if fast_hunyan else 30, step=1, label="Number of Inference Steps")
+                num_inference_steps = gr.Slider(1, 100, value=  default_inference_steps, step=1, label="Number of Inference Steps")
                 seed = gr.Number(value=-1, label="Seed (-1 for random)")
                 max_frames = gr.Slider(1, 100, value=9, step=1, label="Number of input frames to use for Video2World prediction", visible=use_image2video and False) #########
     
@@ -668,7 +763,7 @@ def create_demo(model_path, save_path):
                 with gr.Row(visible=False) as advanced_row:
                     with gr.Column():
                         guidance_scale = gr.Slider(1.0, 20.0, value=1.0, step=0.5, label="Guidance Scale")
-                        flow_shift = gr.Slider(0.0, 25.0, value=17.0 if fast_hunyan else 7.0, step=0.1, label="Flow Shift") 
+                        flow_shift = gr.Slider(0.0, 25.0, value= default_flow_shift, step=0.1, label="Flow Shift") 
                         embedded_guidance_scale = gr.Slider(1.0, 20.0, value=6.0, step=0.5, label="Embedded Guidance Scale")
                         repeat_generation = gr.Slider(1, 25.0, value=1.0, step=1, label="Number of Generated Video per prompt") 
                         tea_cache_setting = gr.Dropdown(
@@ -688,7 +783,6 @@ def create_demo(model_path, save_path):
                 output = gr.Gallery(
                         label="Generated videos", show_label=False, elem_id="gallery"
                     , columns=[3], rows=[1], object_fit="contain", height="auto", selected_index=0, interactive= False)
-                state = gr.State({})
                 generate_btn = gr.Button("Generate")
                 abort_btn = gr.Button("Abort")
 
@@ -724,7 +818,26 @@ def create_demo(model_path, save_path):
             [state], 
             [output , abort_btn]
         )
-    
+
+        apply_btn.click(
+                fn=apply_changes,
+                inputs=[
+                    state,
+                    transformer_t2v_choice,
+                    transformer_i2v_choice,
+                    text_encoder_choice,
+                    attention_choice,
+                    compile_choice,                            
+                    profile_choice,
+                    default_ui_choice,
+                ],
+                outputs= msg
+            ).then( 
+            update_defaults, 
+            [state, num_inference_steps,  flow_shift], 
+            [num_inference_steps,  flow_shift, header]
+                )
+
     return demo
 
 if __name__ == "__main__":
@@ -739,7 +852,7 @@ if __name__ == "__main__":
         server_name = os.getenv("SERVER_NAME", "0.0.0.0")
 
         
-    demo = create_demo(args.model_base, args.save_path)
+    demo = create_demo()
     if args.open_browser:
         import webbrowser 
         if server_name.startswith("http"):
