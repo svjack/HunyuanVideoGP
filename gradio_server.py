@@ -648,7 +648,7 @@ def create_demo(model_path, save_path):
                     #     ],
                     #     value=97,
                     # )
-                num_inference_steps = gr.Slider(1, 100, value=6 if fast_hunyan else 50, step=1, label="Number of Inference Steps")
+                num_inference_steps = gr.Slider(1, 100, value=6 if fast_hunyan else 30, step=1, label="Number of Inference Steps")
                 seed = gr.Number(value=-1, label="Seed (-1 for random)")
                 max_frames = gr.Slider(1, 100, value=9, step=1, label="Number of input frames to use for Video2World prediction", visible=use_image2video and False) #########
     
