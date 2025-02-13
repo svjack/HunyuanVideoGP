@@ -137,7 +137,6 @@ def download_models(transformer_filename, text_encoder_filename):
                 if not os.path.isfile(targetRoot + sourceFolder + "/" + onefile ):          
                     hf_hub_download(repo_id=repoId,  filename=onefile, local_dir = targetRoot, subfolder=sourceFolder)
 
-download_models(transformer_filename_i2v if use_image2video else transformer_filename_t2v, text_encoder_filename) 
 
 offload.default_verboseLevel = verbose_level
 with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "r", encoding="utf-8") as reader:
@@ -184,6 +183,7 @@ def setup_loras(pipe, lora_preselected, lora_dir, lora_preseleted_multiplier):
 
 
 def load_models(i2v,lora_preselected, lora_dir, lora_preseleted_multiplier ):
+    download_models(transformer_filename_i2v if i2v else transformer_filename_t2v, text_encoder_filename) 
     if profile == 5:
         pinToMemory = False
         partialPinning = False
@@ -274,11 +274,11 @@ def apply_changes(  state,
     state["config_new"] = server_config
     state["config_old"] = old_server_config
 
-    global attention_mode, profile, compile, transformer_filename, transformer_filename_i2v, text_encoder_filename
+    global attention_mode, profile, compile, transformer_filename_t2v, transformer_filename_i2v, text_encoder_filename
     attention_mode = server_config["attention_mode"]
     profile = server_config["profile"]
     compile = server_config["compile"]
-    transformer_filename = server_config["transformer_filename"]
+    transformer_filename_t2v = server_config["transformer_filename"]
     transformer_filename_i2v = server_config["transformer_filename_i2v"]
     text_encoder_filename = server_config["text_encoder_filename"]
 
