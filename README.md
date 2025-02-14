@@ -11,7 +11,7 @@
   <a href="https://arxiv.org/abs/2412.03603"><img src="https://img.shields.io/static/v1?label=Tech Report&message=Arxiv:HunyuanVideo&color=red&logo=arxiv"></a> &ensp;
   <a href="https://huggingface.co/tencent/HunyuanVideo"><img src="https://img.shields.io/static/v1?label=HunyuanVideo&message=HuggingFace&color=yellow"></a> &ensp; &ensp;
   <a href="https://huggingface.co/tencent/HunyuanVideo-PromptRewrite"><img src="https://img.shields.io/static/v1?label=HunyuanVideo-PromptRewrite&message=HuggingFace&color=yellow"></a> &ensp; &ensp;
-  [![Replicate](https://replicate.com/zsxkib/hunyuan-video/badge)](https://replicate.com/zsxkib/hunyuan-video)
+
 </div>
 <p align="center">
 
@@ -134,8 +134,8 @@ With the *--fastest* switch activated **a 1280x720 97 frames video takes with a 
 --server-name name : default (0.0.0.0) : Gradio server name\
 --open-browser : open automatically Browser when launching Gradio Server\
 --fast : start the app by loading Fast Hunyuan Video generator (faster but lower quality) + sage attention + teacache x2 
---compile : turn on pytorch compilation
---fastest : shortcut for --fast + --compile
+--compile : turn on pytorch compilation\
+--fastest : shortcut for --fast + --compile\
 --attention mode: force attention mode among, sdpa, flash, sage and xformers
 
 ### Profiles (for power users only)
