@@ -59,11 +59,13 @@ You will find the original Hunyuan Video repository here: https://github.com/Ten
 We provide an `environment.yml` file for setting up a Conda environment.
 Conda's installation instructions are available [here](https://docs.anaconda.com/free/miniconda/index.html).
 
-We recommend CUDA versions 12.4 or 11.8 for the manual installation.
+This app has been tested on Python 3.10 / Pytorch 2.51 / Cuda 12.4.
 
 ```shell
 # 1. Prepare conda environment
 conda env create -f environment.yml
+# or create a venv and do the following
+pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/test/cu124
 
 # 2. Activate the environment
 conda activate HunyuanVideo
@@ -79,12 +81,21 @@ python -m pip install flash-attn==2.7.2.post1
 python -m pip install sageattention==1.0.6 
 
 # 4.3 optional Xformers attention support (same speed as sdpa attention but lower VRAM requirements, easy to install on Linux but much harder on Windows)
-python -m pip install xformers
+python -m pip install xformers==0.0.29
 
 ```
 
 Note that *Flash attention* and *Sage attention* are quite complex to install on Windows but offers a better memory management (and consequently longer videos) than the default *sdpa attention*.
 Likewise *Pytorch Compilation* will work on Windows only if you manage to install Triton. It is quite a complex process I will try to provide a script in the future.
+
+### Ready to use python wheels for Windows users
+I provide here links to simplify the installation for Windows users with Python 3.10 / Pytorch 2.51 / Cuda 12.4. As I am not hosting these files I won't able to provide support neither guarantee they do what they should do.
+- Triton attention (needed for pytorch compilation and Sage attention)
+pip install https://github.com/woct0rdho/triton-windows/releases/download/v3.1.0-windows.post8/triton-3.1.0-cp310-cp310-win_amd64.whl  # triton for pytorch >=2.4.0
+- Xformers attention
+pip install https://download.pytorch.org/whl/cu124/xformers-0.0.29.post1-cp310-cp310-win_amd64.whl
+- Sage attention
+- pip install https://github.com/sdbds/SageAttention-for-windows/releases/download/2.0.1/sageattention-2.0.1+cu124torch2.5.1-cp310-cp310-win_amd64.whl 
 
 ## Run the application
 
