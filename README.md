@@ -62,25 +62,26 @@ Conda's installation instructions are available [here](https://docs.anaconda.com
 This app has been tested on Python 3.10 / Pytorch 2.51 / Cuda 12.4.
 
 ```shell
-# 1. Prepare conda environment
+# 1 - conda. Prepare and activate a conda environment
 conda env create -f environment.yml
-# or create a venv and do the following
-pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/test/cu124
-
-# 2. Activate the environment
 conda activate HunyuanVideo
 
-# 3. Install pip dependencies
+# OR
+
+# 1 - venv. Alternatively create a python 3.10 venv and then do the following
+pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/test/cu124
+
+
+# 2. Install pip dependencies
 python -m pip install -r requirements.txt
 
-
-# 4.1 optional Flash attention support (easy to install on Linux but much harder on Windows)
+# 3.1 optional Flash attention support (easy to install on Linux but much harder on Windows)
 python -m pip install flash-attn==2.7.2.post1
 
-# 4.2 optional Sage attention support (30% faster, easy to install on Linux but much harder on Windows)
+# 3.2 optional Sage attention support (30% faster, easy to install on Linux but much harder on Windows)
 python -m pip install sageattention==1.0.6 
 
-# 4.3 optional Xformers attention support (same speed as sdpa attention but lower VRAM requirements, easy to install on Linux but much harder on Windows)
+# 3.3 optional Xformers attention support (same speed as sdpa attention but lower VRAM requirements, easy to install on Linux but much harder on Windows)
 python -m pip install xformers==0.0.29
 
 ```
@@ -89,8 +90,8 @@ Note that *Flash attention* and *Sage attention* are quite complex to install on
 Likewise *Pytorch Compilation* will work on Windows only if you manage to install Triton. It is quite a complex process I will try to provide a script in the future.
 
 ### Ready to use python wheels for Windows users
-I provide here links to simplify the installation for Windows users with Python 3.10 / Pytorch 2.51 / Cuda 12.4. As I am not hosting these files I won't able to provide support neither guarantee they do what they should do.
-- Triton attention (needed for pytorch compilation and Sage attention)
+I provide here links to simplify the installation for Windows users with Python 3.10 / Pytorch 2.51 / Cuda 12.4. As I am not hosting these files I won't be able to provide support neither guarantee they do what they should do.
+- Triton attention (needed for *pytorch compilation* and *Sage attention*)
 ```
 pip install https://github.com/woct0rdho/triton-windows/releases/download/v3.1.0-windows.post8/triton-3.1.0-cp310-cp310-win_amd64.whl  # triton for pytorch >=2.4.0
 ```
@@ -132,7 +133,7 @@ python gradio_server.py --fast
 ```bash
 python gradio_server.py --fastest
 ```
-Please note that the first sampling step of the first video generation will talke two minutes to perform the compilation. Consecutive generations will be very fast unless you trigger a new compilation by changing the resolution, duration of the video or add / remove loras.
+Please note that the first sampling step of the first video generation will take two minutes to perform the compilation. Consecutive generations will be very fast unless you trigger a new compilation by changing the resolution, duration of the video or add / remove loras.
 
 For these two switches to work you will need to install Triton and Sage attention.
 
@@ -140,6 +141,11 @@ As you can change the prompt without causing a recompilation, theses switches wo
 
 With the *--fastest* switch activated **a 1280x720 97 frames video takes with a Lora takes less than 4 minutes to be generated** !
 
+
+If you are looking for a good tradeoff between speed and quality I suggest you use the official HunyuanVideo model with Sage attention and pytorch compilation. You may as well turn on Teacache which will degrade less the video quality given there are more processing steps. 
+```bash
+python gradio_server.py --attention sage --compile
+```
 
 ### Command line parameters for Gradio Server
 --profile no : default (4) : no of profile between 1 and 5\
