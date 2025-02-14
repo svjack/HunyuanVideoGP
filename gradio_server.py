@@ -468,15 +468,8 @@ def generate_video(
 
 
    # TeaCache
-    trans = hunyuan_video_sampler.pipeline.transformer.__class__
+    trans = hunyuan_video_sampler.pipeline.transformer
     trans.enable_teacache = tea_cache > 0
-    if trans.enable_teacache:
-        trans.num_steps = num_inference_steps
-        trans.cnt = 0
-        trans.rel_l1_thresh = 0.15 # 0.1 for 1.6x speedup, 0.15 for 2.1x speedup
-        trans.accumulated_rel_l1_distance = 0
-        trans.previous_modulated_input = None
-        trans.previous_residual = None
  
     import random
     if seed == None or seed <0:
@@ -496,6 +489,15 @@ def generate_video(
         for _ in range(repeat_generation):
             if abort:
                 break
+
+            if trans.enable_teacache:
+                trans.num_steps = num_inference_steps
+                trans.cnt = 0
+                trans.rel_l1_thresh = 0.15 # 0.1 for 1.6x speedup, 0.15 for 2.1x speedup
+                trans.accumulated_rel_l1_distance = 0
+                trans.previous_modulated_input = None
+                trans.previous_residual = None
+
             video_no += 1
             status = f"Video {video_no}/{total_video}"
             progress(0, desc=status + " - Encoding Prompt" )   
@@ -527,9 +529,12 @@ def generate_video(
 
                     )
                 except:
+                    gen_in_progress = False
                     if temp_filename!= None and  os.path.isfile(temp_filename):
                         os.remove(temp_filename)
-                    gen_in_progress = False
+                    offload.last_offload_obj.unload_all()
+                    gc.collect()
+                    torch.cuda.empty_cache()                        
                     raise gr.Error("The generation of the video has encountered an error: it is likely that you have unsufficient VRAM and you should therefore reduce the video resolution or its number of frames.")
 
 
