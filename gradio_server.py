@@ -139,6 +139,9 @@ def download_models(transformer_filename, text_encoder_filename):
 
 
 offload.default_verboseLevel = verbose_level
+
+download_models(transformer_filename_i2v if use_image2video else transformer_filename_t2v, text_encoder_filename) 
+
 with open("./ckpts/hunyuan-video-t2v-720p/vae/config.json", "r", encoding="utf-8") as reader:
     text = reader.read()
 vae_config= json.loads(text)
