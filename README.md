@@ -91,11 +91,18 @@ Likewise *Pytorch Compilation* will work on Windows only if you manage to instal
 ### Ready to use python wheels for Windows users
 I provide here links to simplify the installation for Windows users with Python 3.10 / Pytorch 2.51 / Cuda 12.4. As I am not hosting these files I won't able to provide support neither guarantee they do what they should do.
 - Triton attention (needed for pytorch compilation and Sage attention)
+```
 pip install https://github.com/woct0rdho/triton-windows/releases/download/v3.1.0-windows.post8/triton-3.1.0-cp310-cp310-win_amd64.whl  # triton for pytorch >=2.4.0
+```
 - Xformers attention
+```
 pip install https://download.pytorch.org/whl/cu124/xformers-0.0.29.post1-cp310-cp310-win_amd64.whl
+```
+
 - Sage attention
-- pip install https://github.com/sdbds/SageAttention-for-windows/releases/download/2.0.1/sageattention-2.0.1+cu124torch2.5.1-cp310-cp310-win_amd64.whl 
+```
+pip install https://github.com/sdbds/SageAttention-for-windows/releases/download/2.0.1/sageattention-2.0.1+cu124torch2.5.1-cp310-cp310-win_amd64.whl 
+```
 
 ## Run the application
 
