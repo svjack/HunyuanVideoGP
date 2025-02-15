@@ -496,7 +496,7 @@ def generate_video(
             if trans.enable_teacache:
                 trans.num_steps = num_inference_steps
                 trans.cnt = 0
-                trans.rel_l1_thresh = 0.15 # 0.1 for 1.6x speedup, 0.15 for 2.1x speedup
+                trans.rel_l1_thresh = tea_cache #0.15 # 0.1 for 1.6x speedup, 0.15 for 2.1x speedup
                 trans.accumulated_rel_l1_distance = 0
                 trans.previous_modulated_input = None
                 trans.previous_residual = None
