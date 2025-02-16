@@ -15,6 +15,32 @@
 </div>
 <p align="center">
 
+# Installtion
+```bash
+git clone https://github.com/deepbeepmeep/HunyuanVideoGP && cd HunyuanVideoGP
+
+#conda env create -f environment.yml
+conda create -n HunyuanVideo python=3.10
+conda activate HunyuanVideo
+pip install ipykernel
+python -m ipykernel install --user --name HunyuanVideo --display-name "HunyuanVideo"
+
+pip install torch==2.5.1 torchvision torchaudio
+pip install -r requirements.txt
+pip install flash-attn==2.7.2.post1
+pip install sageattention==1.0.6
+pip install xformers==0.0.29
+pip install "httpx[socks]"
+```
+
+# Run
+```
+#### set share=True
+python gradio_server.py --fastest
+
+python gradio_server.py --fastest --lora-weight ../Genshin_Impact_XiangLing_HunyuanVideo_lora_early/xiangling_test_epoch4.safetensors --lora-multiplier 1
+
+```
 
 ## News
 * 02/11/2025: Version 4.0 Quality of life features: fast abort video generation, detect automatically attention modes not supported, you can now change video engine parameters without having to restart the app
