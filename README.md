@@ -40,7 +40,7 @@ python gradio_server.py --fastest
 
 python gradio_server.py --fastest --lora-weight ../Genshin_Impact_XiangLing_HunyuanVideo_lora_early/xiangling_test_epoch4.safetensors --lora-multiplier 1
 
-python gradio_server.py --i2v
+ python gradio_server.py --i2v --share
 ```
 
 ## News
